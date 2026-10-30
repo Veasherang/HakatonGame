@@ -13,6 +13,7 @@ import { ReportScene } from './scenes/ReportScene.js';
 import { HorrorScene } from './scenes/HorrorScene.js';
 import { EndingScene } from './scenes/EndingScene.js';
 import { ModalScene } from './scenes/ModalScene.js';
+import { GuideScene } from './scenes/GuideScene.js';
 
 async function loadFonts() {
   if (!document.fonts) return;
@@ -78,6 +79,7 @@ function boot() {
       HorrorScene,
       EndingScene,
       ModalScene,
+      GuideScene,
     ],
   };
 

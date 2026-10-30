@@ -90,6 +90,18 @@ export class IntroScene extends Phaser.Scene {
       if (!this.done) this.complete();
     });
 
+    // Надёжный запуск после подписания: работает даже если клик пришёлся мимо кнопки.
+    this.input.on('pointerup', () => {
+      if (this.done) this.startGame();
+    });
+
+    const advance = () => {
+      if (!this.done) this.complete();
+      else this.startGame();
+    };
+    this.input.keyboard?.on('keydown-ENTER', advance);
+    this.input.keyboard?.on('keydown-SPACE', advance);
+
     this.tweens.add({
       targets: this.signBtn,
       alpha: 0.85,
@@ -122,7 +134,6 @@ export class IntroScene extends Phaser.Scene {
     manager.addLog('ТРУДОВОЙ ДОГОВОР ПОДПИСАН. СМЕНА НАЧАЛАСЬ.', 'sys');
     manager.addLog('ОПЕРАТОР: НАЗНАЧЕН. ПРЕДЫДУЩИЙ ОПЕРАТОР: НЕ НАЙДЕН.', 'plot');
     manager.save(true);
-    manager.gameplayStart?.();
-    this.scene.start('Office');
+    this.scene.start('Guide', { from: 'Office', firstRun: true });
   }
 }

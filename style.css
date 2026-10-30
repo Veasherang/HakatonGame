@@ -123,7 +123,7 @@ body {
   inset: 0;
   z-index: 21;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.32) 88%, rgba(0, 0, 0, 0.55) 100%);
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, 0.22) 90%, rgba(0, 0, 0, 0.42) 100%);
 }
 
 /* ==========================================================================

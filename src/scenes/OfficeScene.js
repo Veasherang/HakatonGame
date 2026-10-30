@@ -543,6 +543,7 @@ export class OfficeScene extends Phaser.Scene {
       if (manager.state?.alarm) this.openRoom(manager.state.alarm.slot);
     });
     this.input.keyboard?.on('keydown-TAB', () => this.openMarket());
+    this.input.keyboard?.on('keydown-H', () => this.showHelp());
   }
 
   /* ========================================================================
@@ -871,20 +872,10 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   showHelp() {
-    this.scene.launch('Modal', {
-      title: 'ИНСТРУКЦИЯ ОПЕРАТОРА',
-      body:
-        'ЦЕЛЬ: продержаться смену, выполнять контракты и не допускать побегов.\n\n' +
-        '· Клик по камере открывает комнату существа.\n' +
-        '· Кормление и успокоение стоят энергии оператора.\n' +
-        '· Для контракта существу нужна готовность не ниже требуемой.\n' +
-        '· Тревога даёт несколько секунд на реакцию: откройте камеру и выберите инструмент.\n' +
-        '· НАДЗОР не всегда говорит правду.\n\n' +
-        'ГОРЯЧИЕ КЛАВИШИ: ESC — пауза, M — звук, TAB — контракты, SPACE — открыть тревожную камеру.',
-      accent: COLORS.cyan,
-      pause: true,
-      typewriter: false,
-      buttons: [{ label: 'ПОНЯТНО', variant: 'ghost' }],
+    manager.audio?.ui?.();
+    this.cameras.main.fadeOut(140, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.start('Guide', { from: 'Office' });
     });
   }
 

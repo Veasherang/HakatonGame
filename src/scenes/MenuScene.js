@@ -93,6 +93,8 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('Market');
     } else if (screen === 'intro') {
       this.scene.start('Intro');
+    } else if (screen === 'guide') {
+      this.scene.start('Guide', { from: 'Menu' });
     } else if (screen === 'horror') {
       manager.state.phase = 'escaping';
       manager.state.escape = { slot: 1, defId: 'vodolazik', name: 'ВОДОЛАЗИК', stage: 2, count: 1 };
@@ -333,6 +335,13 @@ export class MenuScene extends Phaser.Scene {
     });
     this.archiveBtn.setEnabled(endings.length > 0);
 
+    this.guideBtn = new Button(this, x, 620, width, 42, 'КАК ИГРАТЬ', {
+      variant: 'amber',
+      size: 9,
+      icon: 'note',
+      onClick: () => this.openGuide(),
+    });
+
     const sound = this.loadSoundSetting();
     manager.audio?.setMuted(!sound);
     this.soundBtn = new Button(this, 1136, 24, 136, 34, sound ? 'ЗВУК ВКЛ' : 'ЗВУК ВЫКЛ', {
@@ -343,12 +352,17 @@ export class MenuScene extends Phaser.Scene {
     });
 
     if (!this.saveInfo) {
-      makeText(this, x + 2, 618, 'Сохранение не найдено. Начните новую смену.', {
+      makeText(this, x + 2, 676, 'Сохранение не найдено. Начните новую смену.', {
         size: 13,
         color: COLORS.dimmer,
         font: 'body',
       });
     }
+  }
+
+  openGuide() {
+    manager.audio?.ui?.();
+    this.scene.start('Guide', { from: 'Menu' });
   }
 
   buildFooter() {

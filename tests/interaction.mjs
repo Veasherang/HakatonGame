@@ -119,10 +119,44 @@ try {
     await sleep(500);
   };
 
+  const pressKey = async (key, code = key) => {
+    const keyCode = key === 'Enter' ? 13 : key === 'Escape' ? 27 : 0;
+    await client.send('Input.dispatchKeyEvent', {
+      type: 'keyDown',
+      key,
+      code,
+      windowsVirtualKeyCode: keyCode,
+      nativeVirtualKeyCode: keyCode,
+    });
+    await sleep(80);
+    await client.send('Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key,
+      code,
+      windowsVirtualKeyCode: keyCode,
+      nativeVirtualKeyCode: keyCode,
+    });
+    await sleep(600);
+  };
+
   let active = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
   check('Меню открыто', active.includes('Menu'), active);
+
+  await click(268, 641);
+  await sleep(900);
+  active = await evaluate(
+    `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+  );
+  check('Кнопка КАК ИГРАТЬ открывает руководство', active.includes('Guide'), active);
+
+  await pressKey('Escape');
+  await sleep(900);
+  active = await evaluate(
+    `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+  );
+  check('Руководство возвращает в меню', active.includes('Menu'), active);
 
   await click(268, 465);
   await sleep(1500);
@@ -131,25 +165,44 @@ try {
   );
   check('Новая смена открывает договор', active.includes('Intro'), active);
 
-  await sleep(1200);
-  await click(100, 700);
-  await sleep(300);
-  await click(640, 653);
-  await sleep(2000);
+  await sleep(4500);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const ready = await evaluate(
+      `Boolean(window.__ATD__.game.scene.getScene('Intro')?.signBtn?.enabled)`
+    );
+    if (ready) break;
+    await sleep(300);
+  }
+  await pressKey('Enter');
+  await sleep(1800);
   active = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
-  check('Подпись договора запускает офис', active.includes('Office'), active);
+  check('После договора открывается обучение', active.includes('Guide'), active);
+
+  await pressKey('Escape');
+  await sleep(1600);
+  active = await evaluate(
+    `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+  );
+  check('Кнопка НАЧАТЬ СМЕНУ открывает офис', active.includes('Office'), active);
 
   const before = await evaluate(
     `JSON.stringify({ money: __ATD__.manager.state.money, hunger: __ATD__.manager.get(1).stats.hunger })`
   );
 
   await click(400, 190);
-  await sleep(700);
+  await sleep(900);
   active = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
+  if (!active.includes('Room')) {
+    await click(400, 190);
+    await sleep(900);
+    active = await evaluate(
+      `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+    );
+  }
   check('Клик по камере открывает комнату', active.includes('Room'), active);
 
   await evaluate(`(() => {

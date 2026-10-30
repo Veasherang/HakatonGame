@@ -255,6 +255,14 @@ export class RoomScene extends Phaser.Scene {
       origin: [1, 0],
     }).setDepth(40);
 
+    this.helpBtn = new Button(this, 560, 16, 124, 34, 'ПОМОЩЬ', {
+      variant: 'ghost',
+      size: 7,
+      icon: 'note',
+      onClick: () => this.openGuide(),
+    });
+    this.helpBtn.setDepth(41);
+
     this.otherAlarmBtn = new Button(this, 696, 16, 156, 34, 'ПЕРЕЙТИ', {
       variant: 'danger',
       size: 7,
@@ -1752,6 +1760,15 @@ export class RoomScene extends Phaser.Scene {
     this.cameras.main.fadeOut(150, 0, 0, 0);
     this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
       this.scene.start('Office');
+    });
+  }
+
+  openGuide() {
+    manager.audio?.ui?.();
+    this.closeModal();
+    this.cameras.main.fadeOut(140, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this.scene.start('Guide', { from: 'Room', slot: this.slot });
     });
   }
 }

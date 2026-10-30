@@ -143,6 +143,15 @@ async function main() {
     if (expression2?.startsWith('@')) {
       expression2 = fs.readFileSync(expression2.slice(1), 'utf8');
     }
+    if (process.env.ATD_CLICK) {
+      const [clickX, clickY] = process.env.ATD_CLICK.split(',').map(Number);
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: clickX, y: clickY, button: 'none' });
+      await sleep(80);
+      await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: clickX, y: clickY, button: 'left', clickCount: 1 });
+      await sleep(90);
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: clickX, y: clickY, button: 'left', clickCount: 1 });
+      await sleep(700);
+    }
     if (expression2) {
       const evaluated = await client.send('Runtime.evaluate', {
         expression: expression2,
