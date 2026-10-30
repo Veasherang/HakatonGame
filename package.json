@@ -1,0 +1,16 @@
+{
+  "name": "bunker-atd-67",
+  "version": "1.0.0",
+  "description": "Бункер АТД-67 — 2D pixel-art horror simulator / creature management",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "python -m http.server 8080",
+    "test": "node tests/run-tests.mjs",
+    "test:ui": "node tests/interaction.mjs",
+    "build:standalone": "node scripts/build-standalone.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

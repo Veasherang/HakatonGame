@@ -11,3 +11,11 @@ build/
 
 .DS_Store
 Thumbs.db
+
+# Тестовые артефакты и профили headless-браузера
+shots/
+.edge-*/
+.edgeprofile*/
+
+# Временные файлы сборки
+*.zip

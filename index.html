@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05080a" />
+  <meta name="description" content="Бункер АТД-67 — симулятор оператора подземной лаборатории. Следи за существами, выполняй контракты и не задавай лишних вопросов." />
+  <title>БУНКЕР АТД-67</title>
+  <script>
+    // STANDALONE_REDIRECT_START
+    if (location.protocol === 'file:') {
+      location.replace('bunker-atd-67.html');
+    }
+    // STANDALONE_REDIRECT_END
+  </script>
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game" aria-label="Игровое поле"></div>
+
+  <div id="crt-overlay" aria-hidden="true"></div>
+  <div id="vignette" aria-hidden="true"></div>
+
+  <div id="boot">
+    <div class="boot-inner">
+      <div class="boot-logo">АТД<span>-67</span></div>
+      <div class="boot-sub">АВТОМАТИЗИРОВАННЫЙ ТЕРРАРИУМ ДЛЯ ДОКУМЕНТАЦИИ</div>
+      <div class="boot-bar"><div id="boot-progress"></div></div>
+      <div class="boot-status" id="boot-status">ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ…</div>
+    </div>
+  </div>
+
+  <div id="rotate">
+    <div class="rotate-inner">
+      <div class="rotate-icon"></div>
+      <div class="rotate-title">ПОВЕРНИТЕ УСТРОЙСТВО</div>
+      <div class="rotate-text">Бункер АТД-67 требует горизонтального положения экрана.</div>
+    </div>
+  </div>
+
+  <div id="fatal-error" hidden>
+    <div class="fatal-inner">
+      <div class="fatal-title">СБОЙ СИСТЕМЫ</div>
+      <pre id="fatal-text"></pre>
+      <button id="fatal-reload" type="button">ПЕРЕЗАГРУЗИТЬ</button>
+    </div>
+  </div>
+
+  <script src="vendor/phaser.min.js"></script>
+  <script>
+    // Ошибки видимы даже без консоли (полезно для диагностики и мобильных устройств).
+    (function () {
+      var shown = false;
+      function showError(message) {
+        if (shown) return;
+        shown = true;
+        var box = document.getElementById('fatal-error');
+        var text = document.getElementById('fatal-text');
+        if (!box || !text) return;
+        text.textContent = String(message || 'Неизвестная ошибка');
+        box.hidden = false;
+        var boot = document.getElementById('boot');
+        if (boot) boot.style.display = 'none';
+      }
+      window.addEventListener('error', function (e) {
+        showError((e.message || 'Ошибка') + '\n' + (e.filename || '') + ':' + (e.lineno || ''));
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        showError('Promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+      });
+      document.getElementById('fatal-reload').addEventListener('click', function () {
+        location.reload();
+      });
+      window.__ATD_SHOW_ERROR__ = showError;
+
+      // FILE_HINT_START
+      if (location.protocol === 'file:') {
+        showError(
+          'Автономный файл игры не найден.\n\n' +
+          'Откройте bunker-atd-67.html в этой же папке или пересоберите его:\n' +
+          '  node scripts/build-standalone.mjs'
+        );
+      }
+      // FILE_HINT_END
+    })();
+  </script>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
