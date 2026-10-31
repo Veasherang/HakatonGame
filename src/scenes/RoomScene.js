@@ -48,6 +48,7 @@ export class RoomScene extends Phaser.Scene {
     this.buildTopBar();
     this.buildPanel();
     this.buildActions();
+    this.buildInterference();
     this.buildDefense();
     this.bindEvents();
 
@@ -255,6 +256,17 @@ export class RoomScene extends Phaser.Scene {
       origin: [1, 0],
     }).setDepth(40);
 
+    this.topResources = makeText(this, 338, 14, '', {
+      size: 9,
+      color: COLORS.amber,
+      font: 'display',
+    }).setDepth(40);
+    this.topResources2 = makeText(this, 338, 38, '', {
+      size: 8,
+      color: COLORS.dim,
+      font: 'display',
+    }).setDepth(40);
+
     this.helpBtn = new Button(this, 560, 16, 124, 34, 'ПОМОЩЬ', {
       variant: 'ghost',
       size: 7,
@@ -262,6 +274,8 @@ export class RoomScene extends Phaser.Scene {
       onClick: () => this.openGuide(),
     });
     this.helpBtn.setDepth(41);
+    this.backBtn.setDepth(62);
+    this.helpBtn.setDepth(62);
 
     this.otherAlarmBtn = new Button(this, 696, 16, 156, 34, 'ПЕРЕЙТИ', {
       variant: 'danger',
@@ -316,7 +330,7 @@ export class RoomScene extends Phaser.Scene {
     this.bars = {};
     const keys = ['hunger', 'stress', 'energy', 'health', 'aggression', 'cleanliness', 'integrity', 'loyalty'];
     keys.forEach((key, index) => {
-      const bar = new StatBar(this, INNER.x, 146 + index * 30, INNER.w, STAT_META[key].label, {
+      const bar = new StatBar(this, INNER.x, 146 + index * 27, INNER.w, STAT_META[key].label, {
         compact: true,
         labelSize: 12,
         valueSize: 9,
@@ -339,6 +353,20 @@ export class RoomScene extends Phaser.Scene {
     });
     this.readyBar = this.add.graphics();
     panel.add([this.readyLabel, this.readyValue, this.readyBar]);
+
+    this.mutationLabel = makeText(this, INNER.x, 356, 'ШКАЛА МУТАЦИИ', {
+      size: 8,
+      color: COLORS.purple,
+      font: 'display',
+    });
+    this.mutationValue = makeText(this, INNER.x + INNER.w, 354, '', {
+      size: 8,
+      color: COLORS.purple,
+      font: 'display',
+      origin: [1, 0],
+    });
+    this.mutationBar = this.add.graphics();
+    panel.add([this.mutationLabel, this.mutationValue, this.mutationBar]);
 
     const divider = this.add.graphics();
     divider.lineStyle(1, COLORS.line, 0.75);
@@ -409,6 +437,7 @@ export class RoomScene extends Phaser.Scene {
       variant: 'amber',
       size: 8,
       icon: 'mutate',
+      sub: '2400 ₽',
       onClick: () => this.confirmReplacement(),
     });
     this.replacementBtn.setVisible(false);
@@ -445,8 +474,61 @@ export class RoomScene extends Phaser.Scene {
     }).setDepth(40);
   }
 
-  buildDefense() {
-    this.defenseBar = this.add.container(0, 0).setDepth(46).setVisible(false);
+  buildInterference() {
+    const container = this.add.container(0, 0).setDepth(60).setVisible(false);
+    const dim = this.add
+      .rectangle(0, 0, 890, 800, 0x020607, 0.74)
+      .setOrigin(0)
+      .setInteractive();
+    const noise = this.add
+      .tileSprite(0, 0, 890, 800, 'noise0')
+      .setOrigin(0)
+      .setAlpha(0.18);
+    const title = makeText(this, 445, 252, 'ПОМЕХИ НА КАМЕРЕ', {
+      size: 16,
+      color: COLORS.red,
+      font: 'display',
+      origin: [0.5, 0],
+    });
+    const subtitle = makeText(
+      this,
+      445,
+      286,
+      'СВЯЗЬ С СЕКТОРОМ ПОТЕРЯНА.\nВЗАИМОДЕЙСТВИЕ С СУБЪЕКТОМ ЗАБЛОКИРОВАНО.\nВОССТАНОВИТЕ КАНАЛ ИЛИ ДОЖДИТЕСЬ.',
+      { size: 13, color: COLORS.text, font: 'body', align: 'center', origin: [0.5, 0], lineSpacing: 4 }
+    );
+    const timer = makeText(this, 445, 372, '', {
+      size: 24,
+      color: COLORS.red,
+      font: 'display',
+      origin: [0.5, 0],
+    });
+    const clear = new Button(this, 245, 430, 400, 46, 'УСТРАНИТЬ ПОМЕХИ · 360 ₽', {
+      variant: 'danger',
+      size: 8,
+      icon: 'sensor',
+      onClick: () => {
+        const result = manager.clearInterference(this.slot);
+        if (result.ok) {
+          manager.audio?.confirm?.();
+          showToast(this, 'СВЯЗЬ ВОССТАНОВЛЕНА', { kind: 'good', y: 676 });
+        } else {
+          showToast(this, result.reason || 'НЕДОСТУПНО', { kind: 'danger', y: 676 });
+        }
+        this.refreshAll();
+      },
+    });
+    const back = new Button(this, 20, 18, 106, 36, 'НАЗАД', {
+      variant: 'ghost',
+      size: 8,
+      icon: 'back',
+      onClick: () => this.goBack(),
+    });
+    container.add([dim, noise, title, subtitle, timer, clear, back]);
+    this.interference = { container, noise, timer, clear };
+  }
+
+  buildDefense() {    this.defenseBar = this.add.container(0, 0).setDepth(46).setVisible(false);
 
     const bannerG = this.add.graphics();
     drawPanel(bannerG, ROOM_FRAME.x, 84, ROOM_FRAME.w, 76, {
@@ -526,7 +608,18 @@ export class RoomScene extends Phaser.Scene {
       }
       this.refreshAll();
     });
-    on('blackout', () => this.showToast('ПИТАНИЕ ОТКЛЮЧЕНО', 'danger'));
+    on('blackout', () => showToast(this, 'ПИТАНИЕ ОТКЛЮЧЕНО', { kind: 'danger', y: 676 }));
+    on('energy-low', ({ level }) => {
+      showToast(
+        this,
+        level >= 2
+          ? 'ЭНЕРГИЯ НА ИСХОДЕ. ВЫПЕЙТЕ КОФЕ, ИНАЧЕ ДЕНЬ ПРОВАЛЕН.'
+          : 'ЭНЕРГИЯ НИЖЕ 30. СЛЕДИТЕ ЗА ШКАЛОЙ.',
+        { kind: level >= 2 ? 'danger' : 'warning', y: 676, duration: 4200 }
+      );
+      this.cameras.main.shake(level >= 2 ? 220 : 100, level >= 2 ? 0.005 : 0.002);
+      manager.audio?.error?.();
+    });
     on('speed', () => this.refreshAll());
 
     this.input.keyboard?.on('keydown-ESC', () => {
@@ -546,6 +639,23 @@ export class RoomScene extends Phaser.Scene {
     this.refreshDiorama();
     this.refreshDefense();
     this.refreshTop();
+    this.refreshInterference();
+  }
+
+  refreshInterference() {
+    if (!this.interference) return;
+    const remaining = this.state.camDown?.[this.slot] || 0;
+    const active = remaining > 0;
+    this.interference.container.setVisible(active);
+    if (!active) return;
+    if (this.modal && !this.defenseMode) this.closeModal();
+    this.interference.timer.setText(`${Math.ceil(remaining)} С`);
+    this.interference.clear.setEnabled(
+      this.state.money >= 360 && this.state.operatorEnergy >= 7
+    );
+    this.interference.clear.setSub(
+      `ОСТАНЕТСЯ ${formatMoney(Math.max(0, this.state.money - 360))} ₽`
+    );
   }
 
   refreshTop() {
@@ -576,6 +686,12 @@ export class RoomScene extends Phaser.Scene {
     this.topStatus.setText(status);
     this.topStatus.setColor(this.state.alarm?.slot === this.slot ? COLORS.red : COLORS.dim);
     this.topSub.setText(sub);
+    if (this.topResources) {
+      this.topResources.setText(`${formatMoney(this.state.money)} ₽`);
+      this.topResources2.setText(
+        `БИО ${Math.round(this.state.biomass)} · РЕП ${Math.round(this.state.reputation)} · ЭН ${Math.round(this.state.operatorEnergy)}`
+      );
+    }
 
     if (this.state.alarm && this.state.alarm.slot !== this.slot) {
       this.otherAlarmBtn.setVisible(true);
@@ -691,6 +807,25 @@ export class RoomScene extends Phaser.Scene {
       { ticks: true }
     );
 
+    const mutation = manager.mutationInfo(this.slot);
+    const mutationLocked = c.stage >= 3;
+    this.mutationLabel.setText(mutationLocked ? 'МУТАЦИЯ ЗАВЕРШЕНА' : 'ШКАЛА МУТАЦИИ');
+    this.mutationValue.setText(
+      mutationLocked ? 'III / III' : `${mutation.progress}% · ОСТАЛОСЬ ${mutation.remaining}`
+    );
+    this.mutationValue.setColor(mutation.ready ? COLORS.green : COLORS.purple);
+    this.mutationBar.clear();
+    drawBar(
+      this.mutationBar,
+      INNER.x,
+      376,
+      INNER.w,
+      7,
+      mutationLocked ? 100 : mutation.progress,
+      mutationLocked ? COLORS.green : COLORS.purple,
+      { ticks: true }
+    );
+
     this.hintText.setText(this.def.hint);
     this.prefText.setText(
       `ЛЮБИТ: ${FOODS[this.def.food.love]?.name || '—'}  ·  НЕ ЕСТ: ${FOODS[this.def.food.hate]?.name || '—'}`
@@ -722,7 +857,7 @@ export class RoomScene extends Phaser.Scene {
     } else if (c.status === 'terminated') {
       status = 'СУБЪЕКТ УТИЛИЗИРОВАН.\nПРОГРЕСС И КОНТРАКТЫ ПОТЕРЯНЫ.';
     } else if (c.status === 'escaped') {
-      status = 'СУБЪЕКТ СБЕЖАЛ.\nВЕРНЁТСЯ ПОСЛЕ СМЕНЫ — С ПОВЫШЕННОЙ АДАПТАЦИЕЙ.';
+      status = 'СУБЪЕКТ СБЕЖАЛ.\nВЕРНЁТСЯ ПОСЛЕ ДНЯ — С ПОВЫШЕННОЙ АДАПТАЦИЕЙ.';
     } else if (readiness < 60) {
       status = 'НЕ ГОТОВ К КОНТРАКТУ.\nСнизьте стресс и агрессию, обучите навыкам.';
     } else {
@@ -738,6 +873,9 @@ export class RoomScene extends Phaser.Scene {
 
     this.emergencyBtn.setVisible(['idle', 'training'].includes(c.status));
     this.replacementBtn.setVisible(c.status === 'terminated');
+    const jammed = (this.state.camDown?.[this.slot] || 0) > 0;
+    this.emergencyBtn.setEnabled(!jammed);
+    this.replacementBtn.setEnabled(!jammed);
   }
 
   getTrainingNodeName() {
@@ -758,28 +896,42 @@ export class RoomScene extends Phaser.Scene {
     const money = this.state.money;
     const energy = this.state.operatorEnergy;
     const readiness = manager.readinessOf(this.slot);
+    const jammed = (this.state.camDown?.[this.slot] || 0) > 0;
+    const matchingOffers = (this.state.offers || []).filter((offer) =>
+      this.def.professions.includes(offer.profession)
+    );
 
     this.objectButtons?.forEach((button) => {
-      button.setVisible(active);
-      button.setEnabled(active);
+      button.setVisible(active && !jammed);
+      button.setEnabled(active && !jammed);
     });
 
-    this.actionButtons.feed.setEnabled(active && money >= 25 && energy >= 4);
+    if (jammed) {
+      Object.values(this.actionButtons).forEach((button) => button.setEnabled(false));
+      this.actionBar.setVisible(true);
+      this.actionHint
+        .setText('ПОМЕХИ НА КАМЕРЕ. ВЗАИМОДЕЙСТВИЕ ЗАБЛОКИРОВАНО.')
+        .setColor(COLORS.red);
+      return;
+    }
+
+    this.actionButtons.feed.setEnabled(active && money >= 60 && energy >= 4);
     this.actionButtons.train.setEnabled(active);
     this.actionButtons.calm.setEnabled(active && energy >= 4);
-    this.actionButtons.rest.setEnabled(active && (c.restCooldown || 0) <= 0 && energy >= 4);
+    this.actionButtons.rest.setEnabled(active && (c.restCooldown || 0) <= 0 && energy >= 5);
     this.actionButtons.repair.setEnabled(
-      active && c.stats.integrity < maxIntegrity(c) - 1 && money >= 120 && energy >= 6
+      active && c.stats.integrity < maxIntegrity(c) - 1 && money >= 420 && energy >= 8
     );
+    this.actionButtons.repair.setSub('420 ₽');
     this.actionButtons.upgrade.setEnabled(active);
     const nextMutation = getMutation(this.def, c.stage + 1);
-    this.actionButtons.mutate.setEnabled(
-      active && Boolean(nextMutation) && this.state.biomass >= (nextMutation?.cost || Infinity) && energy >= 10
-    );
-    this.actionButtons.contract.setEnabled(
-      active && this.state.offers.length > 0 && readiness >= 40
-    );
-    this.actionButtons.contract.setSub(String(this.state.offers.length));
+    this.actionButtons.mutate.setEnabled(active && Boolean(nextMutation));
+    if (nextMutation) {
+      const info = manager.mutationInfo(this.slot);
+      this.actionButtons.mutate.setSub(`${info.progress}%`);
+    }
+    this.actionButtons.contract.setEnabled(active && matchingOffers.length > 0 && readiness >= 40);
+    this.actionButtons.contract.setSub(String(matchingOffers.length));
 
     if (this.state.alarm?.slot === this.slot) {
       this.actionBar.setVisible(false);
@@ -792,9 +944,13 @@ export class RoomScene extends Phaser.Scene {
         this.actionHint.setText('СУБЪЕКТ УТИЛИЗИРОВАН. ДОСТУПЕН ЗАПРОС ЗАМЕНЫ.').setColor(COLORS.red);
       } else if (c.status === 'training') {
         this.actionHint.setText('ИДЁТ ОБУЧЕНИЕ. КОРМЛЕНИЕ И УСПОКОЕНИЕ ДОСТУПНЫ.').setColor(COLORS.cyan);
+      } else if (energy < 30) {
+        this.actionHint
+          .setText(`ЭНЕРГИЯ ОПЕРАТОРА ${Math.round(energy)} · КРИТИЧЕСКИ МАЛО · КОФЕ +24`)
+          .setColor(COLORS.red);
       } else {
         this.actionHint.setText(
-          `ЭНЕРГИЯ ОПЕРАТОРА ${Math.round(this.state.operatorEnergy)} · БЮДЖЕТ ${formatMoney(this.state.money)} ₽ · БИОМАССА ${Math.round(this.state.biomass)}`
+          `ЭНЕРГИЯ ${Math.round(energy)} · БЮДЖЕТ ${formatMoney(money)} ₽ · БИОМАССА ${Math.round(this.state.biomass)}`
         ).setColor(COLORS.dimmer);
       }
     }
@@ -861,6 +1017,11 @@ export class RoomScene extends Phaser.Scene {
 
     if (this.defenseMode) {
       this.defenseTimer.setAlpha(0.7 + Math.sin(time / 160) * 0.3);
+    }
+    if (this.interference?.container.visible) {
+      this.interference.noise.tilePositionX = (time / 8) % 96;
+      this.interference.noise.tilePositionY = (time / 13) % 96;
+      this.interference.noise.setAlpha(0.14 + Math.random() * 0.16);
     }
   }
 
@@ -978,12 +1139,19 @@ export class RoomScene extends Phaser.Scene {
       height: 600,
       build: (content, ox, oy) => {
         const cardW = 430;
-        const cardH = 138;
+        const cardH = 132;
+        content.add(
+          makeText(this, ox, oy, `БЮДЖЕТ: ${formatMoney(this.state.money)} ₽ · ЭНЕРГИЯ: ${Math.round(this.state.operatorEnergy)}`, {
+            size: 12,
+            color: COLORS.green,
+            font: 'display',
+          })
+        );
         foods.forEach((food, index) => {
           const col = index % 2;
           const row = Math.floor(index / 2);
           const x = ox + col * (cardW + 14);
-          const y = oy + row * (cardH + 12);
+          const y = oy + 24 + row * (cardH + 10);
           const g = this.add.graphics();
           drawPanel(g, x, y, cardW, cardH, {
             fill: 0x0b1416,
@@ -1013,6 +1181,12 @@ export class RoomScene extends Phaser.Scene {
             font: 'display',
             origin: [1, 0],
           });
+          const after = makeText(this, x + cardW - 16, y + 28, `ОСТАНЕТСЯ ${formatMoney(Math.max(0, this.state.money - food.price))} ₽`, {
+            size: 7,
+            color: this.state.money >= food.price ? COLORS.dimmer : COLORS.red,
+            font: 'display',
+            origin: [1, 0],
+          });
           const prefText = makeText(this, x + 46, y + 32, pref, {
             size: 11,
             color: prefColor,
@@ -1025,13 +1199,13 @@ export class RoomScene extends Phaser.Scene {
             `ГОЛОД −${food.nutrition}   ЭНЕРГИЯ +${food.energy}   СТРЕСС ${food.stress >= 0 ? '+' : '−'}${Math.abs(food.stress)}   ЧИСТОТА ${food.cleanliness >= 0 ? '+' : '−'}${Math.abs(food.cleanliness)}`,
             { size: 11, color: COLORS.cyan, font: 'body' }
           );
-          const desc = makeText(this, x + 16, y + 76, food.desc, {
-            size: 11,
+          const desc = makeText(this, x + 16, y + 72, food.desc, {
+            size: 10,
             color: COLORS.dim,
             font: 'body',
-            wrap: cardW - 32,
+            wrap: cardW - 160,
           });
-          const button = new Button(this, x + cardW - 138, y + cardH - 46, 122, 34, 'ДАТЬ', {
+          const button = new Button(this, x + cardW - 138, y + cardH - 34, 122, 28, 'ДАТЬ', {
             variant: 'primary',
             size: 8,
             onClick: () => {
@@ -1050,7 +1224,7 @@ export class RoomScene extends Phaser.Scene {
               }
             },
           });
-          content.add([name, price, prefText, effects, desc, button]);
+          content.add([name, price, after, prefText, effects, desc, button]);
         });
       },
     });
@@ -1067,6 +1241,13 @@ export class RoomScene extends Phaser.Scene {
       build: (content, ox, oy) => {
         const cardW = 284;
         const gap = 14;
+        content.add(
+          makeText(this, ox, oy, `БЮДЖЕТ: ${formatMoney(this.state.money)} ₽ · ЭНЕРГИЯ: ${Math.round(this.state.operatorEnergy)} ₽`, {
+            size: 12,
+            color: COLORS.green,
+            font: 'display',
+          })
+        );
         branches.forEach((branch, colIndex) => {
           const x = ox + colIndex * (cardW + gap);
           const learned = branch.nodes.filter((node, idx) => {
@@ -1075,12 +1256,12 @@ export class RoomScene extends Phaser.Scene {
             return this.creature.skills[nodeId];
           }).length;
 
-          const title = makeText(this, x, oy, branch.name, {
+          const title = makeText(this, x, oy + 24, branch.name, {
             size: 9,
             color: branch.color,
             font: 'display',
           });
-          const progress = makeText(this, x + cardW, oy + 2, `${learned}/3`, {
+          const progress = makeText(this, x + cardW, oy + 26, `${learned}/3`, {
             size: 9,
             color: COLORS.dim,
             font: 'display',
@@ -1091,7 +1272,7 @@ export class RoomScene extends Phaser.Scene {
           branch.nodes.forEach((node, index) => {
             const nodeId = `${this.def.id}_${branch.id}_${index + 1}`;
             const state = manager.skillState(this.slot, nodeId);
-            const y = oy + 30 + index * 138;
+            const y = oy + 50 + index * 138;
             const g = this.add.graphics();
             const accent =
               state.state === 'learned'
@@ -1262,12 +1443,19 @@ export class RoomScene extends Phaser.Scene {
       height: 590,
       build: (content, ox, oy) => {
         const keys = Object.keys(UPGRADES);
+        content.add(
+          makeText(this, ox, oy, `БЮДЖЕТ: ${formatMoney(this.state.money)} ₽ · ЭНЕРГИЯ: ${Math.round(this.state.operatorEnergy)}`, {
+            size: 12,
+            color: COLORS.green,
+            font: 'display',
+          })
+        );
         keys.forEach((key, index) => {
           const upgrade = UPGRADES[key];
           const level = this.creature.upgrades[key] || 0;
-          const y = oy + index * 76;
+          const y = oy + 22 + index * 68;
           const g = this.add.graphics();
-          drawPanel(g, ox, y, 880, 68, {
+          drawPanel(g, ox, y, 880, 64, {
             fill: 0x0b1416,
             stroke: focusKey === key ? COLORS.amber : COLORS.line,
             alpha: 0.96,
@@ -1337,122 +1525,207 @@ export class RoomScene extends Phaser.Scene {
 
   openMutationPanel() {
     if (!this.def) return;
+    const current = this.creature;
+    const next = getMutation(this.def, current.stage + 1);
     this.openModal({
-      title: 'МУТАЦИИ · ' + this.def.name,
+      title: 'КЛИКЕР МУТАЦИИ · ' + this.def.name,
       accent: COLORS.purple,
-      width: 960,
-      height: 600,
+      width: 980,
+      height: 620,
       build: (content, ox, oy) => {
-        for (let stage = 1; stage <= 3; stage += 1) {
-          const x = ox + (stage - 1) * 296;
-          const y = oy;
-          const mutation = getMutation(this.def, stage);
-          const isCurrent = this.creature.stage === stage;
-          const isPast = this.creature.stage > stage;
-          const isNext = this.creature.stage === stage - 1;
-          const accent = isCurrent ? COLORS.green : isNext ? COLORS.purple : COLORS.line;
-
-          const g = this.add.graphics();
-          drawPanel(g, x, y, 282, 440, {
-            fill: 0x0b1416,
-            stroke: accent,
-            alpha: 0.96,
-            cornerSize: 6,
-          });
-          content.add(g);
-
-          const stageLabel = makeText(this, x + 14, y + 10, `СТАДИЯ ${roman(stage)}`, {
+        const cardW = 300;
+        const cardH = 470;
+        const g = this.add.graphics();
+        drawPanel(g, ox, oy, cardW, cardH, {
+          fill: 0x0b1416,
+          stroke: COLORS.green,
+          alpha: 0.96,
+          cornerSize: 6,
+        });
+        content.add(g);
+        content.add(
+          makeText(this, ox + 14, oy + 12, `ТЕКУЩАЯ СТАДИЯ ${roman(current.stage)}`, {
             size: 9,
-            color: accent,
+            color: COLORS.green,
             font: 'display',
-          });
-          const stageName = makeText(this, x + 14, y + 30, this.def.stageNames[stage - 1], {
+          })
+        );
+        content.add(
+          makeText(this, ox + 14, oy + 34, this.def.stageNames[current.stage - 1], {
             size: 8,
             color: COLORS.dim,
             font: 'display',
-          });
-          content.add([stageLabel, stageName]);
-
-          const textureKey = `${this.def.id}_${stage}_thumb`;
-          if (this.textures.exists(textureKey)) {
-            const image = this.add.image(x + 141, y + 190, textureKey).setOrigin(0.5, 1);
-            const scale = Math.min(150 / image.height, 240 / image.width);
-            image.setScale(scale);
-            content.add(image);
-          }
-
-          const desc = makeText(this, x + 14, y + 200, mutation ? mutation.desc : this.def.stageDesc[0], {
+          })
+        );
+        const textureKey = `${this.def.id}_${current.stage}_thumb`;
+        if (this.textures.exists(textureKey)) {
+          const image = this.add.image(ox + cardW / 2, oy + 210, textureKey).setOrigin(0.5, 1);
+          const scale = Math.min(160 / image.height, 250 / image.width);
+          image.setScale(scale);
+          content.add(image);
+        }
+        content.add(
+          makeText(this, ox + 14, oy + 226, this.def.stageDesc[current.stage - 1], {
             size: 11,
             color: COLORS.dim,
             font: 'body',
-            wrap: 254,
+            wrap: cardW - 28,
             lineSpacing: 3,
-          });
-          content.add(desc);
+          })
+        );
+        content.add(
+          makeText(this, ox + 14, oy + 390, `СТРЕСС ${Math.round(current.stats.stress)} · АГРЕССИЯ ${Math.round(current.stats.aggression)}`, {
+            size: 8,
+            color: COLORS.amber,
+            font: 'display',
+          })
+        );
 
-          if (mutation) {
-            const effects = Object.entries(mutation.stat || {})
-              .map(([key, value]) => `${STAT_META[key]?.short || key} ${value > 0 ? '+' : ''}${value}`)
-              .join('   ');
-            const effectText = makeText(this, x + 14, y + 312, effects, {
-              size: 8,
-              color: COLORS.amber,
-              font: 'display',
-              wrap: 254,
-            });
-            content.add(effectText);
-
-            let label = 'МУТИРОВАТЬ';
-            let enabled = isNext && this.state.biomass >= mutation.cost && this.state.operatorEnergy >= 10;
-            let variant = 'purple';
-            if (isCurrent || isPast) {
-              label = isCurrent ? 'ТЕКУЩАЯ СТАДИЯ' : 'ПРОЙДЕНО';
-              enabled = false;
-              variant = 'ghost';
-            } else if (!isNext) {
-              label = 'ТРЕБУЕТСЯ ПРЕДЫДУЩАЯ';
-              enabled = false;
-              variant = 'ghost';
-            }
-            const costText = makeText(this, x + 14, y + 344, `${mutation.cost} БИОМАССЫ · 10 ЭНЕРГИИ`, {
-              size: 8,
-              color: enabled ? COLORS.green : COLORS.dimmer,
-              font: 'display',
-            });
-            const button = new Button(this, x + 14, y + 372, 254, 40, label, {
-              variant,
-              size: 7,
-              enabled,
-              onClick: () => {
-                const result = manager.mutate(this.slot);
-                if (result.ok) {
-                  manager.audio?.mutate?.();
-                  this.cameras.main.flash(300, 120, 60, 160);
-                  showToast(this, `МУТАЦИЯ: ${result.mutation.name}`, { kind: 'plot', y: 676 });
-                  this.closeModal();
-                  this.refreshAll();
-                } else {
-                  showToast(this, result.reason || 'НЕДОСТУПНО', { kind: 'danger', y: 676 });
-                }
-              },
-            });
-            content.add([costText, button]);
-          } else {
-            const current = makeText(this, x + 14, y + 356, 'ТЕКУЩАЯ СТАДИЯ', {
-              size: 8,
+        const rx = ox + 330;
+        const rw = 580;
+        if (!next) {
+          content.add(
+            makeText(this, rx, oy + 20, 'ФИНАЛЬНАЯ СТАДИЯ', {
+              size: 14,
               color: COLORS.green,
               font: 'display',
-            });
-            content.add(current);
-          }
+            })
+          );
+          content.add(
+            makeText(
+              this,
+              rx,
+              oy + 60,
+              'Дальше мутировать некуда. Существо достигло предела протокола — и перестало быть тем, кем было.',
+              { size: 15, color: COLORS.dim, font: 'body', wrap: rw, lineSpacing: 5 }
+            )
+          );
+          return;
         }
+
+        content.add(
+          makeText(this, rx, oy + 16, `СЛЕДУЮЩАЯ СТАДИЯ ${roman(current.stage + 1)}`, {
+            size: 13,
+            color: COLORS.purple,
+            font: 'display',
+          })
+        );
+        content.add(
+          makeText(this, rx, oy + 44, next.name, {
+            size: 18,
+            color: COLORS.text,
+            font: 'display',
+          })
+        );
+        content.add(
+          makeText(this, rx, oy + 74, next.desc, {
+            size: 13,
+            color: COLORS.dim,
+            font: 'body',
+            wrap: rw,
+            lineSpacing: 4,
+          })
+        );
+        const effects = Object.entries(next.stat || {})
+          .map(([key, value]) => `${STAT_META[key]?.short || key} ${value > 0 ? '+' : ''}${value}`)
+          .join('   ');
+        content.add(
+          makeText(this, rx, oy + 154, effects, {
+            size: 9,
+            color: COLORS.amber,
+            font: 'display',
+          })
+        );
+
+        const barX = rx;
+        const barY = oy + 210;
+        const barW = rw;
+        const barG = this.add.graphics();
+        content.add(barG);
+        const progressText = makeText(this, rx, oy + 178, '', {
+          size: 9,
+          color: COLORS.purple,
+          font: 'display',
+        });
+        const remainingText = makeText(this, rx + rw, oy + 178, '', {
+          size: 9,
+          color: COLORS.purple,
+          font: 'display',
+          origin: [1, 0],
+        });
+        const hint = makeText(
+          this,
+          rx,
+          oy + 232,
+          'КАЖДОЕ НАЖАТИЕ ПРИБЛИЖАЕТ ПРЕВРАЩЕНИЕ. СЛЕДИ ЗА СТРЕССОМ И АГРЕССИЕЙ.',
+          { size: 11, color: COLORS.dimmer, font: 'body', wrap: rw }
+        );
+        content.add([progressText, remainingText, hint]);
+
+        let info = manager.mutationInfo(this.slot);
+        const finish = new Button(this, rx, oy + 398, rw, 46, 'ЗАВЕРШИТЬ МУТАЦИЮ', {
+          variant: 'purple',
+          size: 9,
+          icon: 'mutate',
+          onClick: () => {
+            const result = manager.mutate(this.slot);
+            if (result.ok) {
+              manager.audio?.mutate?.();
+              this.cameras.main.flash(300, 120, 60, 160);
+              showToast(this, `МУТАЦИЯ: ${result.mutation.name}`, { kind: 'plot', y: 676 });
+              this.closeModal();
+              this.refreshAll();
+            } else {
+              showToast(this, result.reason || 'НЕДОСТУПНО', { kind: 'danger', y: 676 });
+            }
+          },
+        });
+        content.add(finish);
+
+        const click = new Button(this, rx + rw / 2 - 170, oy + 302, 340, 78, 'НАЖИМАТЬ', {
+          variant: 'primary',
+          size: 14,
+          icon: 'mutate',
+          onClick: () => {
+            const result = manager.mutationClick(this.slot);
+            if (!result.ok) {
+              showToast(this, result.reason || 'НЕДОСТУПНО', { kind: 'danger', y: 676 });
+              return;
+            }
+            manager.audio?.ui?.();
+            this.cameras.main.shake(45, 0.0015);
+            paint();
+          },
+        });
+        content.add(click);
+
+        const paint = () => {
+          info = manager.mutationInfo(this.slot);
+          barG.clear();
+          drawBar(barG, barX, barY, barW, 10, info.progress, COLORS.purple, { ticks: true });
+          progressText.setText(`ПРОГРЕСС ${info.progress}%`);
+          remainingText.setText(info.ready ? 'ШКАЛА ЗАПОЛНЕНА' : `ОСТАЛОСЬ ${info.remaining}`);
+          progressText.setColor(info.ready ? COLORS.green : COLORS.purple);
+          remainingText.setColor(info.ready ? COLORS.green : COLORS.purple);
+          const enough = this.state.biomass >= next.cost && this.state.operatorEnergy >= 12;
+          finish.setEnabled(info.ready && enough);
+          finish.setSub(
+            info.ready
+              ? `${next.cost} БИО · ${this.state.biomass} В НАЛИЧИИ`
+              : `НУЖНО ${next.cost} БИОМАССЫ`
+          );
+          click.setLabel(info.ready ? 'ШКАЛА ЗАПОЛНЕНА' : 'НАЖИМАТЬ');
+        };
+        paint();
       },
     });
   }
 
   openContractPanel() {
     if (!this.def) return;
-    const offers = this.state.offers || [];
+    const offers = (this.state.offers || []).filter((offer) =>
+      this.def.professions.includes(offer.profession)
+    );
     const readiness = manager.readinessOf(this.slot);
     this.openModal({
       title: 'КОНТРАКТЫ · ' + this.def.name,
@@ -1474,7 +1747,7 @@ export class RoomScene extends Phaser.Scene {
             this,
             ox,
             oy + 40,
-            'НЕТ ДОСТУПНЫХ ПРЕДЛОЖЕНИЙ.\nВсе контракты уже распределены или смена подходит к концу.',
+            'НЕТ ДОСТУПНЫХ ПРЕДЛОЖЕНИЙ.\nВсе контракты уже распределены или день подходит к концу.',
             { size: 14, color: COLORS.dim, font: 'body', wrap: 860, lineSpacing: 5 }
           );
           content.add(empty);
@@ -1535,8 +1808,7 @@ export class RoomScene extends Phaser.Scene {
           content.add([pay, flavor]);
 
           const canTake = readiness >= offer.reqReadiness;
-          const button = new Button(this, ox + 640, y + 74, 224, 30, canTake ? 'НАЗНАЧИТЬ' : 'НЕ ГОТОВ', {
-            variant: canTake ? 'amber' : 'ghost',
+          const button = new Button(this, ox + 640, y + 74, 224, 30, canTake ? 'НАЗНАЧИТЬ' : 'НЕ ГОТОВ', {            variant: canTake ? 'amber' : 'ghost',
             size: 7,
             enabled: canTake,
             onClick: () => {
@@ -1757,18 +2029,12 @@ export class RoomScene extends Phaser.Scene {
       return;
     }
     manager.audio?.ui?.();
-    this.cameras.main.fadeOut(150, 0, 0, 0);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start('Office');
-    });
+    this.scene.start('Office');
   }
 
   openGuide() {
     manager.audio?.ui?.();
     this.closeModal();
-    this.cameras.main.fadeOut(140, 0, 0, 0);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start('Guide', { from: 'Room', slot: this.slot });
-    });
+    this.scene.start('Guide', { from: 'Room', slot: this.slot });
   }
 }

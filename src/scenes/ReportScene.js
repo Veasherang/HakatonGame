@@ -1,5 +1,5 @@
 /**
- * Отчёт по завершённой смене.
+ * Отчёт по завершённому дню.
  */
 import { game as manager } from '../managers/GameManager.js';
 import { NOTES } from '../data/plot.js';
@@ -55,12 +55,12 @@ export class ReportScene extends Phaser.Scene {
     panel.lineStyle(1, COLORS.amber, 0.5);
     panel.lineBetween(112, 96, 1168, 96);
 
-    makeText(this, 116, 52, 'ОТЧЁТ ПО СМЕНЕ', {
+    makeText(this, 116, 52, 'ОТЧЁТ ПО ДНЮ', {
       size: 16,
       color: COLORS.amber,
       font: 'display',
     });
-    makeText(this, 1164, 54, `ДЕНЬ ${String(this.report.day).padStart(2, '0')} · СМЕНА ${String(this.report.shift).padStart(2, '0')}`, {
+    makeText(this, 1164, 54, `ДЕНЬ ${String(this.report.day).padStart(2, '0')}`, {
       size: 10,
       color: COLORS.dim,
       font: 'display',
@@ -68,7 +68,7 @@ export class ReportScene extends Phaser.Scene {
     });
     makeText(this, 116, 72, this.report.reasonText, {
       size: 13,
-      color: this.report.reason === 'escape' ? COLORS.red : COLORS.dim,
+      color: this.report.failed ? COLORS.red : COLORS.dim,
       font: 'body',
     });
 
@@ -111,7 +111,7 @@ export class ReportScene extends Phaser.Scene {
     divider.lineStyle(1, COLORS.line, 0.7);
     divider.lineBetween(116, 286, 620, 286);
 
-    makeText(this, 116, 300, 'ИТОГО ЗА СМЕНУ', { size: 10, color: COLORS.text, font: 'display' });
+    makeText(this, 116, 300, 'ИТОГО ЗА ДЕНЬ', { size: 10, color: COLORS.text, font: 'display' });
     makeText(this, 620, 296, `${report.net >= 0 ? '+' : '−'}${formatMoney(Math.abs(report.net))} ₽`, {
       size: 14,
       color: report.net >= 0 ? COLORS.green : COLORS.red,
@@ -147,7 +147,7 @@ export class ReportScene extends Phaser.Scene {
     makeText(this, 116, 386, 'КОНТРАКТЫ', { size: 8, color: COLORS.dim, font: 'display' });
     const contracts = this.report.contracts || [];
     if (!contracts.length) {
-      makeText(this, 116, 410, 'Контрактов не было. Смена прошла без внешних заказов.', {
+      makeText(this, 116, 410, 'Контрактов не было. День прошёл без внешних заказов.', {
         size: 12,
         color: COLORS.dimmer,
         font: 'body',
@@ -302,7 +302,7 @@ export class ReportScene extends Phaser.Scene {
         color: COLORS.red,
         font: 'display',
       });
-      makeText(this, 706, 650, 'СЛЕДУЮЩАЯ СМЕНА БУДЕТ ПОСЛЕДНЕЙ.', {
+      makeText(this, 706, 650, 'СЛЕДУЮЩИЙ ДЕНЬ БУДЕТ ПОСЛЕДНИМ.', {
         size: 10,
         color: COLORS.amber,
         font: 'body',
@@ -322,7 +322,7 @@ export class ReportScene extends Phaser.Scene {
     });
 
     if (this.state.ending?.final) {
-      new Button(this, 936, 686, 240, 44, 'ПОСЛЕДНЯЯ СМЕНА', {
+      new Button(this, 936, 686, 240, 44, 'ПОСЛЕДНИЙ ДЕНЬ', {
         variant: 'danger',
         size: 9,
         icon: 'skull',
@@ -331,13 +331,23 @@ export class ReportScene extends Phaser.Scene {
           this.scene.start('Ending');
         },
       });
+    } else if (this.report.failed) {
+      new Button(this, 906, 686, 270, 44, 'НАЧАТЬ ДЕНЬ ЗАНОВО', {
+        variant: 'danger',
+        size: 9,
+        icon: 'back',
+        onClick: () => {
+          const ok = manager.restartDay();
+          if (ok) this.scene.start('Office');
+        },
+      });
     } else {
-      new Button(this, 916, 686, 260, 44, 'СЛЕДУЮЩАЯ СМЕНА', {
+      new Button(this, 916, 686, 260, 44, 'СЛЕДУЮЩИЙ ДЕНЬ', {
         variant: 'primary',
         size: 9,
         icon: 'contract',
         onClick: () => {
-          const ok = manager.nextShift();
+          const ok = manager.nextDay();
           if (ok) this.scene.start('Office');
         },
       });

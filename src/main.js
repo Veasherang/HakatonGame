@@ -9,6 +9,7 @@ import { IntroScene } from './scenes/IntroScene.js';
 import { OfficeScene } from './scenes/OfficeScene.js';
 import { RoomScene } from './scenes/RoomScene.js';
 import { MarketScene } from './scenes/MarketScene.js';
+import { ShopScene } from './scenes/ShopScene.js';
 import { ReportScene } from './scenes/ReportScene.js';
 import { HorrorScene } from './scenes/HorrorScene.js';
 import { EndingScene } from './scenes/EndingScene.js';
@@ -20,9 +21,8 @@ async function loadFonts() {
   try {
     await Promise.race([
       Promise.all([
-        document.fonts.load('12px "Press Start 2P"'),
-        document.fonts.load('16px "Pixelify Sans"'),
-        document.fonts.load('600 16px "Pixelify Sans"'),
+        document.fonts.load('500 16px "Rubik"'),
+        document.fonts.load('700 16px "Rubik"'),
       ]),
       new Promise((resolve) => setTimeout(resolve, 2500)),
     ]);
@@ -75,6 +75,7 @@ function boot() {
       OfficeScene,
       RoomScene,
       MarketScene,
+      ShopScene,
       ReportScene,
       HorrorScene,
       EndingScene,

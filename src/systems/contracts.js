@@ -4,6 +4,7 @@
  */
 import { BALANCE, clamp } from '../config/balance.js';
 import { COMPANY_LIST, getCompany } from '../data/companies.js';
+import { getCreatureDef } from '../data/creatures.js';
 import {
   addXp,
   applyContractResult,
@@ -13,6 +14,8 @@ import {
   readiness,
 } from './creatures.js';
 
+const PAY_SCALE = 2.1;
+
 let offerCounter = 0;
 
 function nextOfferId() {
@@ -20,7 +23,7 @@ function nextOfferId() {
   return `offer_${Date.now().toString(36)}_${offerCounter}`;
 }
 
-/** Сгенерировать предложения на смену. */
+/** Сгенерировать предложения на день. */
 export function generateOffers(state, rng) {
   const pairs = [];
   for (const company of COMPANY_LIST) {
@@ -31,17 +34,34 @@ export function generateOffers(state, rng) {
   const shuffled = rng.shuffle(pairs);
   const offers = [];
 
-  for (let index = 0; index < BALANCE.contract.offersPerShift && index < shuffled.length; index += 1) {
-    const { company, template } = shuffled[index];
+  // Хотя бы часть заказов должна подходить тем, кто уже живёт в бункере.
+  const available = new Set(
+    state.creatures
+      .filter((creature) => creature.defId)
+      .flatMap((creature) => getCreatureDef(creature.defId)?.professions || [])
+  );
+  const viable = shuffled.filter((pair) => available.has(pair.template.profession));
+  const ordered = [
+    ...viable.slice(0, 2),
+    ...shuffled.filter((pair) => !viable.slice(0, 2).includes(pair)),
+  ];
+
+  for (let index = 0; index < BALANCE.contract.offersPerShift && index < ordered.length; index += 1) {
+    const { company, template } = ordered[index];
     const dayScale = 1 + (state.day - 1) * BALANCE.contract.payScalePerDay;
     const repScale = 1 + state.reputation * BALANCE.contract.payScalePerRep;
     const variance = 0.9 + rng.next() * 0.22;
-    const pay = Math.max(80, Math.round((template.basePay * dayScale * repScale * variance) / 10) * 10);
-    const duration = Math.round(template.duration * (0.85 + rng.next() * 0.3));
+    const pay = Math.max(
+      180,
+      Math.round((template.basePay * PAY_SCALE * dayScale * repScale * variance) / 10) * 10
+    );
+    const duration = Math.round(template.duration * (0.8 + rng.next() * 0.3));
     const reqReadiness = clamp(
-      template.readiness + (state.day - 1) * 1.15 + (state.reputation - 50) * 0.08,
+      template.readiness +
+        (state.day - 1) * BALANCE.difficulty.contractPerDay +
+        (state.reputation - 50) * 0.08,
       24,
-      94
+      96
     );
 
     offers.push({
@@ -75,6 +95,13 @@ export function canAcceptOffer(creature, offer) {
   if (creature.status === 'empty') return { ok: false, reason: 'Пустая клетка' };
   if (creature.status === 'training') return { ok: false, reason: 'Идёт обучение' };
   if (creature.stats.health <= 20) return { ok: false, reason: 'Слишком плохое здоровье' };
+  const def = creatureDef(creature);
+  if (!def?.professions?.includes(offer.profession)) {
+    return {
+      ok: false,
+      reason: `${def?.name || 'Субъект'} не умеет выполнять «${offer.profession}»`,
+    };
+  }
   if (readiness(creature) < offer.reqReadiness) {
     return { ok: false, reason: `Недостаточная готовность (${readiness(creature)}/${offer.reqReadiness})` };
   }

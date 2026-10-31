@@ -72,7 +72,7 @@ export class GuideScene extends Phaser.Scene {
       38,
       196,
       40,
-      this.firstRun ? 'НАЧАТЬ СМЕНУ' : 'ВЕРНУТЬСЯ',
+      this.firstRun ? 'НАЧАТЬ ДЕНЬ' : 'ВЕРНУТЬСЯ',
       {
         variant: this.firstRun ? 'primary' : 'default',
         size: 8,

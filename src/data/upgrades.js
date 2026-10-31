@@ -73,7 +73,8 @@ export const getUpgrade = (key) => UPGRADES[key] || null;
 export const upgradeCost = (key, level) => {
   const def = UPGRADES[key];
   if (!def) return Infinity;
-  return level >= UPGRADE_MAX_LEVEL ? Infinity : def.costs[level];
+  if (level >= UPGRADE_MAX_LEVEL) return Infinity;
+  return Math.round((def.costs[level] * 2.4) / 10) * 10;
 };
 
 export const maxIntegrity = (creature) =>

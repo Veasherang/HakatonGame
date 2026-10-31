@@ -11,6 +11,9 @@
  *
  * Стадии мутаций соответствуют трём предоставленным спрайтам (1–3).
  */
+import { BALANCE } from '../config/balance.js';
+
+const MUTATION_PRICE_SCALE = 2.2;
 
 export const CREATURE_DEFS = {
   bobek: {
@@ -58,7 +61,7 @@ export const CREATURE_DEFS = {
         name: 'ВПИТЫВАНИЕ',
         color: 0x6fa8b8,
         nodes: [
-          { name: 'СБОР СЛИЗИ', cost: 160, time: 24, effect: { biomass: 0.6, cleanRate: 0.2 }, desc: 'Слизь можно собирать в биомассу. +0.6 биомассы за смену.' },
+          { name: 'СБОР СЛИЗИ', cost: 160, time: 24, effect: { biomass: 0.6, cleanRate: 0.2 }, desc: 'Слизь можно собирать в биомассу. +0.6 биомассы за день.' },
           { name: 'ФИЛЬТРАЦИЯ', cost: 280, time: 32, effect: { healthRegen: 0.15, stressRate: 0.05 }, desc: 'Он фильтрует собственную слизь. Здоровье восстанавливается быстрее.' },
           { name: 'СПОРЫ', cost: 460, time: 42, effect: { biomass: 1.0, income: 0.08 }, desc: 'Споры повышают ценность существа для биотех-компаний. +8% к оплате.' },
         ],
@@ -111,7 +114,7 @@ export const CREATURE_DEFS = {
       'На третьей стадии она держит метлу. Никто не видел, чтобы её кто-то дал.',
     ],
     base: { hunger: 28, stress: 48, energy: 80, health: 74, aggression: 30, cleanliness: 70, integrity: 80, loyalty: 44 },
-    professions: ['cleaning', 'tech'],
+    professions: ['cleaning'],
     professionNames: ['УБОРЩИЦА', 'СОРТИРОВЩИЦА'],
     food: { love: 'porridge', hate: 'meat' },
     triggers: { light: 0.4, noise: 0.35, vent: 1.3, lock: 0.8, power: 0.9 },
@@ -273,7 +276,7 @@ export const CREATURE_DEFS = {
       'Костюм стабилизирует мутации. В нём он перестаёт меняться — и перестаёт быть человеком.',
     ],
     base: { hunger: 38, stress: 58, energy: 46, health: 66, aggression: 24, cleanliness: 64, integrity: 76, loyalty: 38 },
-    professions: ['tech', 'research', 'diving'],
+    professions: ['cleaning', 'labour', 'mining', 'combat', 'construction', 'research', 'tech', 'diving'],
     professionNames: ['ТЕХНИК', 'ИССЛЕДОВАТЕЛЬ'],
     food: { love: 'gel', hate: 'dry' },
     triggers: { light: 0.55, noise: 1.25, vent: 1.5, lock: 0.7, power: 0.9 },
@@ -354,6 +357,48 @@ export const EMPTY_SLOTS = [
   },
 ];
 
+/**
+ * Питомник. В начале игры в бункере только Бобэк.
+ * Остальные субъекты покупаются по мере открытия протоколов.
+ */
+export const CREATURE_SHOP = [
+  {
+    id: 'bobek',
+    slot: 1,
+    price: 0,
+    unlockDay: 1,
+    start: true,
+    tag: 'СТАРТОВЫЙ СУБЪЕКТ',
+    blurb: 'Пёс-губка. Уже в бункере. Ест бульон, боится резкого шума.',
+  },
+  {
+    id: 'pamydsa',
+    slot: 2,
+    price: 1800,
+    unlockDay: 2,
+    tag: 'ЖИВОТНОЕ',
+    blurb: 'Птица с человеческим зрачком. Только уборка и сортировка.',
+  },
+  {
+    id: 'mishutka',
+    slot: 3,
+    price: 3800,
+    unlockDay: 4,
+    tag: 'ЖИВОТНОЕ · КИБОРГ',
+    blurb: 'Медведь-киборг. Военные и строительные контракты. Тяжёлый, дорогой, опасный.',
+  },
+  {
+    id: 'vodolazik',
+    slot: 4,
+    price: 7200,
+    unlockDay: 7,
+    secret: true,
+    tag: 'ПРОТОКОЛ 07',
+    blurb: 'Последний лот. До открытия протокола информация скрыта.',
+    reveal: 'ЭТО ЧЕЛОВЕК. Эксперименты больше не ограничены животными.',
+  },
+];
+
 export const SLOT_COUNT = 6;
 
 export const getCreatureDef = (id) => CREATURE_DEFS[id] || null;
@@ -361,8 +406,14 @@ export const getCreatureDef = (id) => CREATURE_DEFS[id] || null;
 export const creatureBySlot = (slot) =>
   Object.values(CREATURE_DEFS).find((def) => def.slot === slot) || null;
 
-export const getMutation = (def, stage) =>
-  (def?.mutations || []).find((mutation) => mutation.stage === stage) || null;
+export const getMutation = (def, stage) => {
+  const mutation = (def?.mutations || []).find((item) => item.stage === stage) || null;
+  if (!mutation) return null;
+  return {
+    ...mutation,
+    cost: Math.round((mutation.cost * MUTATION_PRICE_SCALE) / 5) * 5,
+  };
+};
 
 /**
  * Все узлы навыков существа в плоском виде.
@@ -375,6 +426,7 @@ export const skillNodes = (def) => {
     branch.nodes.forEach((node, index) => {
       result.push({
         ...node,
+        cost: Math.round((node.cost * BALANCE.training.priceScale) / 10) * 10,
         id: `${def.id}_${branch.id}_${index + 1}`,
         branchId: branch.id,
         branchName: branch.name,

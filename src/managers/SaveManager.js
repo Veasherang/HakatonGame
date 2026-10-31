@@ -64,7 +64,7 @@ export class SaveManager {
   /** Проверка и нормализация структуры. */
   normalize(data) {
     if (!data || typeof data !== 'object') throw new Error('Некорректный формат сохранения');
-    if (data.version !== this.version) {
+    if (!isNumber(data.version) || data.version < 2 || data.version > this.version) {
       throw new Error(
         `Несовместимая версия сохранения (${data.version ?? '—'} вместо ${this.version})`
       );
@@ -77,6 +77,7 @@ export class SaveManager {
     }
 
     const state = { ...data };
+    state.version = this.version;
     state.day = Math.max(1, Math.floor(state.day));
     state.shift = Math.max(1, Math.floor(state.shift));
     state.money = Math.max(0, state.money);
@@ -105,6 +106,7 @@ export class SaveManager {
     state.settings = { sound: true, ...(state.settings || {}) };
     state.stats = {
       shiftsDone: 0,
+      daysDone: 0,
       contractsDone: 0,
       escapes: 0,
       moneyEarned: 0,
@@ -131,8 +133,11 @@ export class SaveManager {
     state.nextEventIn = isNumber(state.nextEventIn) ? state.nextEventIn : 30;
     state.aiCooldown = isNumber(state.aiCooldown) ? state.aiCooldown : 20;
     state.coffeeUsed = isNumber(state.coffeeUsed) ? state.coffeeUsed : 0;
+    state.energyWarned = isNumber(state.energyWarned) ? state.energyWarned : 0;
     state.blackout = Boolean(state.blackout);
     state.escape = null;
+    state.daySnapshot =
+      state.daySnapshot && typeof state.daySnapshot === 'object' ? state.daySnapshot : null;
     state.shiftStats = {
       repStart: state.reputation,
       moneyStart: state.money,
@@ -167,6 +172,8 @@ export class SaveManager {
         normalized.flags = normalized.flags || {};
         normalized.adaptation = Math.max(0, normalized.adaptation || 0);
         normalized.stage = clamp(normalized.stage || 1, 1, 3);
+        normalized.mutationClicks = Math.max(0, Math.floor(normalized.mutationClicks || 0));
+        normalized.mutationProgress = clamp(normalized.mutationProgress || 0);
         normalized.level = Math.max(1, normalized.level || 1);
         normalized.xp = Math.max(0, normalized.xp || 0);
         normalized.status = [

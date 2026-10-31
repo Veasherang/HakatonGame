@@ -50,10 +50,20 @@ export class MarketScene extends Phaser.Scene {
       color: COLORS.amber,
       font: 'display',
     });
-    makeText(this, 160, 40, `КОРПОРАТИВНЫЕ ЗАКАЗЫ · ДЕНЬ ${this.state.day} · СМЕНА ${this.state.shift}`, {
+    makeText(this, 160, 40, `КОРПОРАТИВНЫЕ ЗАКАЗЫ · ДЕНЬ ${this.state.day} · ЦЕНЫ РАСТУТ`, {
       size: 12,
       color: COLORS.dim,
       font: 'body',
+    });
+
+    const shop = new Button(this, 760, 12, 180, 38, 'ПИТОМНИК', {
+      variant: 'purple',
+      size: 8,
+      icon: 'mutate',
+      onClick: () => {
+        manager.audio?.ui?.();
+        this.scene.start('Shop');
+      },
     });
 
     const money = makeText(this, 1256, 12, `${formatMoney(this.state.money)} ₽`, {
@@ -62,7 +72,7 @@ export class MarketScene extends Phaser.Scene {
       font: 'display',
       origin: [1, 0],
     });
-    makeText(this, 1256, 36, 'ВРЕМЯ СМЕНЫ ПРИОСТАНОВЛЕНО', {
+    makeText(this, 1256, 36, 'ВРЕМЯ ДНЯ ПРИОСТАНОВЛЕНО', {
       size: 10,
       color: COLORS.dimmer,
       font: 'body',
@@ -98,7 +108,7 @@ export class MarketScene extends Phaser.Scene {
         this,
         52,
         160,
-        'НОВЫХ ПРЕДЛОЖЕНИЙ НЕТ.\n\nВсе контракты распределены. Вернитесь к камерам, дождитесь следующей смены или завершите смену.',
+        'НОВЫХ ПРЕДЛОЖЕНИЙ НЕТ.\n\nВсе контракты распределены. Вернитесь к камерам, дождитесь следующего дня или завершите день.',
         { size: 15, color: COLORS.dim, font: 'body', wrap: 760, lineSpacing: 7 }
       );
       return;
@@ -106,9 +116,9 @@ export class MarketScene extends Phaser.Scene {
 
     this.state.offers.forEach((offer, index) => {
       const x = 28;
-      const y = 116 + index * 162;
+      const y = 112 + index * 132;
       const w = 836;
-      const h = 150;
+      const h = 124;
       const g = this.add.graphics();
       drawPanel(g, x, y, w, h, {
         fill: 0x0b1416,
@@ -122,57 +132,58 @@ export class MarketScene extends Phaser.Scene {
         .rectangle(x + 5, y, 1, h, offer.color || COLORS.amber, 0.25)
         .setOrigin(0);
 
-      makeText(this, x + 18, y + 8, offer.companyName, {
+      makeText(this, x + 18, y + 6, offer.companyName, {
         size: 9,
         color: COLORS.text,
         font: 'display',
       });
-      makeText(this, x + 18, y + 26, offer.specialization, {
-        size: 11,
+      makeText(this, x + 18, y + 22, offer.specialization, {
+        size: 10,
         color: COLORS.dimmer,
         font: 'body',
       });
-      makeText(this, x + 18, y + 44, offer.title, {
-        size: 18,
+      makeText(this, x + 18, y + 36, offer.title, {
+        size: 15,
         color: COLORS.text,
         font: 'body',
       });
       makeText(
         this,
         x + 18,
-        y + 72,
+        y + 56,
         `${professionLabel[offer.profession] || offer.profession}  ·  РИСК ${'★'.repeat(offer.risk)}${'☆'.repeat(3 - offer.risk)}  ·  ${Math.round((offer.duration / 60) * 10) / 10} МИН`,
-        { size: 11, color: COLORS.dim, font: 'body' }
+        { size: 10, color: COLORS.dim, font: 'body' }
       );
 
       const ready = manager.state.creatures.filter(
         (creature) =>
           creature.defId &&
           creature.status === 'idle' &&
-          manager.readinessOf(creature.slot) >= offer.reqReadiness
+          manager.readinessOf(creature.slot) >= offer.reqReadiness &&
+          manager.def(creature.slot)?.professions.includes(offer.profession)
       ).length;
       makeText(
         this,
         x + 18,
-        y + 94,
+        y + 74,
         `ГОТОВНОСТЬ ${offer.reqReadiness}/100 · ПОДХОДЯЩИХ: ${ready}`,
         { size: 8, color: ready ? COLORS.green : COLORS.red, font: 'display' }
       );
-      makeText(this, x + 18, y + 114, offer.flavor, {
-        size: 11,
+      makeText(this, x + 18, y + 94, offer.flavor, {
+        size: 10,
         color: COLORS.dimmer,
         font: 'body',
-        wrap: 550,
+        wrap: 520,
       });
 
-      makeText(this, x + w - 30, y + 10, `${formatMoney(offer.pay)} ₽`, {
-        size: 16,
+      makeText(this, x + w - 30, y + 8, `${formatMoney(offer.pay)} ₽`, {
+        size: 14,
         color: COLORS.amber,
         font: 'display',
         origin: [1, 0],
       });
 
-      const button = new Button(this, x + w - 250, y + h - 44, 220, 34, ready ? 'ВЫБРАТЬ ИСПОЛНИТЕЛЯ' : 'НЕТ ГОТОВЫХ', {
+      const button = new Button(this, x + w - 240, y + h - 38, 210, 28, ready ? 'ВЫБРАТЬ ИСПОЛНИТЕЛЯ' : 'НЕТ ГОТОВЫХ', {
         variant: ready ? 'amber' : 'ghost',
         size: 7,
         enabled: ready > 0,
@@ -345,8 +356,9 @@ export class MarketScene extends Phaser.Scene {
         const y = py + 96 + index * 86;
         const readiness = manager.readinessOf(creature.slot);
         const def = manager.def(creature.slot);
-        const eligible = readiness >= offer.reqReadiness && creature.status === 'idle';
         const professionMatch = def?.professions.includes(offer.profession);
+        const eligible =
+          readiness >= offer.reqReadiness && creature.status === 'idle' && professionMatch;
 
         const rowG = this.add.graphics();
         drawPanel(rowG, px + 22, y, width - 44, 74, {
@@ -391,8 +403,7 @@ export class MarketScene extends Phaser.Scene {
           size: 7,
           enabled: eligible,
           onClick: () => this.assign(offer, creature.slot),
-        });
-        container.add(button);
+        });        container.add(button);
       });
 
     const close = new Button(this, px + width - 46, py + 12, 30, 26, 'X', {
@@ -429,9 +440,6 @@ export class MarketScene extends Phaser.Scene {
 
   goBack() {
     manager.audio?.ui?.();
-    this.cameras.main.fadeOut(140, 0, 0, 0);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start('Office');
-    });
+    this.scene.start('Office');
   }
 }

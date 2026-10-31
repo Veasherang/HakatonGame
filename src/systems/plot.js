@@ -86,6 +86,14 @@ export function buildChoices(state) {
       hint: `Нужно 4 записки (${notes}).`,
       endingId: 'witness',
     },
+    {
+      id: 'subject',
+      label: 'СТАТЬ ПОДОПЫТНЫМ',
+      desc: 'Подписать форму 07-Б и войти в клетку 06. Добровольно.',
+      enabled: true,
+      hint: 'Доступно всегда. НАДЗОР будет доволен.',
+      endingId: 'subject',
+    },
   ];
 }
 

@@ -1,4 +1,4 @@
-/** Отчёты по сменам и переход к следующей смене. */
+/** Отчёты по дням и переход к следующему дню. */
 import { BALANCE, clamp } from '../config/balance.js';
 import { generateOffers } from './contracts.js';
 import { biomassPerShift } from './creatures.js';
@@ -11,20 +11,25 @@ export function computeSalary(state) {
 }
 
 export const REASON_TEXT = {
-  time: 'Смена завершена по регламенту.',
-  manual: 'Смена завершена досрочно оператором.',
-  exhausted: 'Оператор потерял сознание от усталости. Смена прервана.',
-  escape: 'Побег существа. Смена прервана.',
-  blackout: 'Аварийное отключение питания. Смена прервана.',
+  time: 'День завершён по регламенту.',
+  manual: 'День завершён досрочно оператором.',
+  exhausted: 'Оператор потерял сознание от усталости. День провален.',
+  escape: 'Побег существа. День провален.',
+  blackout: 'Аварийное отключение питания. День прерван.',
 };
 
-/** Собрать отчёт по завершённой смене. */
+export const FAILURE_REASONS = new Set(['escape', 'exhausted']);
+
+/** Собрать отчёт по завершённому дню. */
 export function buildReport(state, reason) {
   const stats = state.shiftStats;
-  const salary = computeSalary(state);
-  const production = state.creatures
-    .filter((creature) => creature.defId && ['idle', 'training'].includes(creature.status))
-    .reduce((sum, creature) => sum + biomassPerShift(creature), 0);
+  const failed = FAILURE_REASONS.has(reason);
+  const salary = failed ? 0 : computeSalary(state);
+  const production = failed
+    ? 0
+    : state.creatures
+        .filter((creature) => creature.defId && ['idle', 'training'].includes(creature.status))
+        .reduce((sum, creature) => sum + biomassPerShift(creature), 0);
 
   const earned = stats.moneyEarned + salary;
   const net = earned - stats.moneySpent - (stats.moneyLost || 0);
@@ -32,8 +37,9 @@ export function buildReport(state, reason) {
   return {
     day: state.day,
     shift: state.shift,
+    failed,
     reason,
-    reasonText: REASON_TEXT[reason] || 'Смена завершена.',
+    reasonText: REASON_TEXT[reason] || 'День завершён.',
     salary,
     earned,
     spent: stats.moneySpent,
@@ -67,19 +73,19 @@ export function buildReport(state, reason) {
   };
 }
 
-/** Новый рабочий день. */
+/** Новый день. */
 export function advanceDay(state, rng) {
   state.day += 1;
-  state.shift += 1;
+  state.shift = 1;
   state.shiftDuration = BALANCE.shift.durationSec;
   state.shiftTimeLeft = state.shiftDuration;
   state.operatorEnergy = BALANCE.shift.energyMax;
-  state.power = clamp(state.power + 30, 0, BALANCE.power.max);
+  state.power = clamp(state.power + 35, 0, BALANCE.power.max);
   state.alarm = null;
   state.alarmCooldown = 0;
   state.camDown = {};
-  state.aiCooldown = 0;
-  state.nextEventIn = 35;
+  state.aiCooldown = 8;
+  state.nextEventIn = 14;
   state.blackout = false;
   state.offers = generateOffers(state, rng);
   state.phase = 'office';
@@ -87,20 +93,22 @@ export function advanceDay(state, rng) {
   state.escape = null;
   state.coffeeUsed = 0;
   state.operatorEffects = {};
+  state.energyWarned = 0;
 
   for (const creature of state.creatures) {
     if (!creature.defId) continue;
     if (creature.status === 'escaped') recapture(creature);
     if (creature.status === 'contract' && creature.contract) {
-      // Контракт может длиться дольше смены — он продолжается.
+      // Контракт может длиться дольше дня — он продолжается.
       creature.contract.endIn = Math.max(1, creature.contract.endIn);
     }
     if (creature.training && creature.training.timeLeft > 0) {
       creature.status = 'training';
     }
-    creature.stats.hunger = clamp(creature.stats.hunger + 6);
+    creature.stats.hunger = clamp(creature.stats.hunger + 8);
     creature.stats.energy = clamp(creature.stats.energy + 12);
-    creature.stats.stress = clamp(creature.stats.stress - 4);
+    creature.stats.stress = clamp(creature.stats.stress - 3);
+    creature.stats.cleanliness = clamp(creature.stats.cleanliness + 4);
     creature.flags = {};
   }
 

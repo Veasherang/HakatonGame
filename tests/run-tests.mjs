@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { GameManager } from '../src/managers/GameManager.js';
 import { BALANCE, clamp } from '../src/config/balance.js';
-import { CREATURE_DEFS, EMPTY_SLOTS, getSkillNode, skillNodes } from '../src/data/creatures.js';
+import { CREATURE_SHOP, CREATURE_DEFS, EMPTY_SLOTS, getMutation, getSkillNode, skillNodes } from '../src/data/creatures.js';
 import { FOODS } from '../src/data/food.js';
 import { COMPANY_LIST } from '../src/data/companies.js';
 import { UPGRADES } from '../src/data/upgrades.js';
@@ -57,11 +57,13 @@ test('Новая партия: структура состояния', () => {
   assert.equal(state.day, 1);
   assert.equal(state.shift, 1);
   assert.equal(state.creatures.length, 6);
-  assert.equal(state.creatures.filter((creature) => creature.defId).length, 4);
-  assert.equal(state.creatures.filter((creature) => creature.status === 'empty').length, 2);
+  assert.equal(state.creatures.filter((creature) => creature.defId).length, 1);
+  assert.equal(state.creatures.filter((creature) => creature.status === 'empty').length, 5);
+  assert.equal(state.creatures[0].defId, 'bobek');
   assert.equal(state.offers.length, BALANCE.contract.offersPerShift);
   assert.equal(state.money, BALANCE.economy.startMoney);
   assert.equal(state.phase, 'office');
+  assert.ok(state.daySnapshot, 'снимок дня создан');
   for (const creature of state.creatures.filter((item) => item.defId)) {
     for (const key of ['hunger', 'stress', 'energy', 'health', 'aggression', 'cleanliness', 'integrity', 'loyalty']) {
       assert.ok(creature.stats[key] >= 0 && creature.stats[key] <= 100, `${creature.name}:${key}`);
@@ -118,24 +120,36 @@ test('Улучшение оборудования повышает уровен�
   assert.ok(manager.state.money < BALANCE.economy.startMoney);
 });
 
-test('Мутация требует биомассу и меняет стадию', () => {
+test('Кликер мутации заполняет шкалу и меняет стадию', () => {
   const manager = fresh(13);
   const creature = manager.get(1);
-  manager.state.biomass = 200;
+  manager.state.biomass = 400;
+  assert.equal(manager.mutate(1).ok, false, 'без кликов мутация недоступна');
+  for (let index = 0; index < 10; index += 1) manager.mutationClick(1);
+  const info = manager.mutationInfo(1);
+  assert.equal(info.progress, 100);
+  assert.equal(info.remaining, 0);
+  const cost = getMutation(CREATURE_DEFS.bobek, 2).cost;
   const result = manager.mutate(1);
-  assert.equal(result.ok, true);
+  assert.equal(result.ok, true, result.reason);
   assert.equal(creature.stage, 2);
-  assert.equal(manager.state.biomass, 200 - CREATURE_DEFS.bobek.mutations[0].cost);
-  const second = manager.mutate(1);
-  assert.equal(second.ok, true);
-  assert.equal(creature.stage, 3);
-  const third = manager.mutate(1);
-  assert.equal(third.ok, false);
+  assert.equal(manager.state.biomass, 400 - cost);
+  assert.equal(manager.mutationInfo(1).remaining, 14);
+  assert.equal(manager.mutate(1).ok, false);
 });
 
-test('Контракт: отправка, возвращение и учёт', () => {
+test('Контракт: профессия, отправка, возвращение и учёт', () => {
   const manager = fresh(21);
-  const offer = manager.state.offers[0];
+  const offer = manager.state.offers.find((item) =>
+    ['cleaning', 'labour'].includes(item.profession)
+  );
+  assert.ok(offer, 'должен быть контракт под профессию Бобэка');
+  const wrong = manager.state.offers.find(
+    (item) => !['cleaning', 'labour'].includes(item.profession)
+  );
+  if (wrong) {
+    assert.equal(manager.acceptOffer(wrong.id, 1).ok, false);
+  }
   const creature = manager.get(1);
   for (const key of Object.keys(creature.stats)) creature.stats[key] = 100;
   creature.stats.hunger = 0;
@@ -216,7 +230,7 @@ test('Повреждённое сохранение не ломает игру',
   assert.ok(storage.getItem(`${BALANCE.save.key}_broken`));
 });
 
-test('Смена: отчёт и переход к следующему дню', () => {
+test('День: отчёт и переход к следующему дню', () => {
   const manager = fresh(66);
   const report = manager.endShift('manual');
   assert.ok(report);
@@ -238,6 +252,16 @@ test('Финальная развилка и концовка', () => {
   assert.equal(result.id, 'servant');
   assert.equal(manager.state.phase, 'ended');
   assert.ok(manager.state.meta.unlockedEndings.includes('servant'));
+});
+
+test('Концовка «стать подопытным» доступна', () => {
+  const manager = fresh(78);
+  manager.state.day = BALANCE.plot.finalDay;
+  manager.endShift('manual');
+  assert.ok(manager.state.ending.choices.some((choice) => choice.id === 'subject'));
+  const result = manager.finishEnding('subject');
+  assert.equal(result.id, 'subject');
+  assert.ok(manager.state.meta.unlockedEndings.includes('subject'));
 });
 
 test('Аварийный протокол и замена существа', () => {
@@ -275,12 +299,58 @@ test('Все данные согласованы', () => {
     }
   }
   assert.equal(NOTES.length, 8);
-  assert.equal(Object.keys(ENDINGS).length, 5);
+  assert.equal(Object.keys(ENDINGS).length, 6);
   assert.equal(EMPTY_SLOTS.length, 2);
   assert.equal(Object.keys(UPGRADES).length, 6);
+  assert.equal(CREATURE_SHOP.length, 4);
+  assert.equal(CREATURE_SHOP.filter((item) => item.secret).length, 1);
 });
 
-test('Симуляция 10 смен: экономика не уходит в минус и не ломается', () => {
+test('Питомник: старт с одним существом и покупка по дням', () => {
+  const manager = fresh(303);
+  assert.equal(manager.get(2).status, 'empty');
+  manager.state.money = 5000;
+  assert.equal(manager.buyCreature('pamydsa').ok, false, 'день 1 — протокол закрыт');
+  manager.state.day = 2;
+  const result = manager.buyCreature('pamydsa');
+  assert.equal(result.ok, true);
+  assert.equal(manager.get(2).defId, 'pamydsa');
+  assert.equal(manager.state.money, 3200);
+  assert.equal(manager.buyCreature('pamydsa').ok, false, 'повторная покупка запрещена');
+  manager.state.day = 7;
+  manager.state.money = 10000;
+  assert.equal(manager.buyCreature('vodolazik').ok, true);
+  assert.equal(manager.state.plot.flags.vodolazik_revealed, true);
+});
+
+test('Поражение перезапускает тот же день, а не следующий', () => {
+  const manager = fresh(404);
+  const startMoney = manager.state.money;
+  manager.state.money = 123;
+  manager.beginEscape(manager.get(1));
+  const report = manager.completeEscape();
+  assert.equal(report.failed, true);
+  assert.equal(report.salary, 0);
+  assert.equal(manager.state.day, 1);
+  assert.equal(manager.restartDay(), true);
+  assert.equal(manager.state.day, 1);
+  assert.equal(manager.state.phase, 'office');
+  assert.equal(manager.state.money, startMoney);
+  assert.equal(manager.get(1).status, 'idle');
+});
+
+test('Сложность и события растут с днём', () => {
+  const manager = fresh(505);
+  const day1 = manager.state.nextEventIn;
+  manager.state.day = 6;
+  assert.ok(day1 > 0);
+  assert.ok(manager.state.daySnapshot);
+  assert.equal(manager.state.offers.length, BALANCE.contract.offersPerShift);
+  const req = manager.state.offers.map((offer) => offer.reqReadiness);
+  assert.ok(Math.min(...req) >= 24);
+});
+
+test('Симуляция 10 дней: экономика не уходит в минус и не ломается', () => {
   const manager = fresh(2026);
   let totalContracts = 0;
 
@@ -307,13 +377,13 @@ test('Симуляция 10 смен: экономика не уходит в м
         const def = manager.def(creature.slot);
         if (creature.status !== 'idle') continue;
 
-        if (creature.stats.hunger > 45 && manager.state.money > 200) {
+        if (creature.stats.hunger > 45 && manager.state.money > 250) {
           manager.feed(creature.slot, def.food.love);
         }
         if (creature.stats.stress > 50 && manager.state.operatorEnergy > 30) {
           manager.calm(creature.slot, bestTool(def));
         }
-        if (creature.stats.integrity < 65 && manager.state.money > 300) {
+        if (creature.stats.integrity < 65 && manager.state.money > 500) {
           manager.repairCell(creature.slot);
         }
         if (creature.stats.energy < 30 && manager.state.operatorEnergy > 40) {
@@ -324,7 +394,9 @@ test('Симуляция 10 смен: экономика не уходит в м
       for (const offer of [...manager.state.offers]) {
         const candidate = activeCreatures(manager).find(
           (creature) =>
-            creature.status === 'idle' && readiness(creature) >= offer.reqReadiness
+            creature.status === 'idle' &&
+            readiness(creature) >= offer.reqReadiness &&
+            manager.def(creature.slot)?.professions.includes(offer.profession)
         );
         if (candidate) {
           const accepted = manager.acceptOffer(offer.id, candidate.slot);
@@ -332,7 +404,7 @@ test('Симуляция 10 смен: экономика не уходит в м
         }
       }
 
-      if (manager.state.operatorEnergy < 30) manager.buyCoffee();
+      if (manager.state.operatorEnergy < 30 && manager.state.money > 200) manager.buyCoffee();
     }
 
     if (manager.state.phase === 'office') manager.endShift('manual');

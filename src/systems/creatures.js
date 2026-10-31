@@ -32,6 +32,8 @@ export function createCreature(defId, slotOverride = null) {
     stage: 1,
     level: 1,
     xp: 0,
+    mutationProgress: 0,
+    mutationClicks: 0,
     stats: { ...def.base },
     upgrades: { ...UPGRADE_DEFAULT },
     skills: {},
@@ -229,12 +231,18 @@ export function tickCreature(creature, dt, env = {}, messages = []) {
   const s = creature.stats;
   const triggers = def.triggers || {};
   const minutes = dt / 60;
+  const difficulty = Math.max(0.5, Number(env.difficulty) || 1);
 
   // --- Голод и чистота -----------------------------------------------------
-  const hungerRate = BALANCE.creature.hungerRate * (1 - upg.feeder * 0.09) * (1 - mods.hungerRate);
+  const hungerRate =
+    BALANCE.creature.hungerRate * difficulty * (1 - upg.feeder * 0.09) * (1 - mods.hungerRate);
   s.hunger += hungerRate * minutes;
 
-  const cleanRate = BALANCE.creature.cleanlinessRate * (1 - upg.feeder * 0.06) * (1 - mods.cleanRate);
+  const cleanRate =
+    BALANCE.creature.cleanlinessRate *
+    difficulty *
+    (1 - upg.feeder * 0.06) *
+    (1 - mods.cleanRate);
   s.cleanliness -= cleanRate * minutes;
 
   // --- Стресс --------------------------------------------------------------
@@ -261,20 +269,20 @@ export function tickCreature(creature, dt, env = {}, messages = []) {
   }
 
   stressRate -= mods.stressRate;
-  s.stress += stressRate * minutes;
+  s.stress += stressRate * difficulty * minutes;
 
   // --- Энергия и агрессия --------------------------------------------------
-  s.energy -= BALANCE.creature.energyRate * minutes;
-  if (creature.status === 'training') s.energy -= 0.6 * minutes;
-  if (creature.status === 'training') s.stress += 0.15 * minutes;
+  s.energy -= BALANCE.creature.energyRate * difficulty * minutes;
+  if (creature.status === 'training') s.energy -= 0.8 * minutes;
+  if (creature.status === 'training') s.stress += 0.25 * minutes;
 
   let aggressionRate = BALANCE.creature.aggressionBase;
-  if (s.stress > 60) aggressionRate += ((s.stress - 60) / 100) * 1.3;
-  if (s.hunger > 75) aggressionRate += 0.55;
-  if (s.cleanliness < BALANCE.creature.cleanBad) aggressionRate += 0.3;
-  if (s.integrity < BALANCE.creature.integrityBad) aggressionRate += 0.25;
+  if (s.stress > 60) aggressionRate += ((s.stress - 60) / 100) * 1.5;
+  if (s.hunger > 75) aggressionRate += 0.7;
+  if (s.cleanliness < BALANCE.creature.cleanBad) aggressionRate += 0.4;
+  if (s.integrity < BALANCE.creature.integrityBad) aggressionRate += 0.35;
   if (s.loyalty > 70) aggressionRate -= 0.25;
-  s.aggression += aggressionRate * minutes;
+  s.aggression += aggressionRate * difficulty * minutes;
 
   // --- Здоровье ------------------------------------------------------------
   let healthDelta = 0;
@@ -298,7 +306,8 @@ export function tickCreature(creature, dt, env = {}, messages = []) {
   decay *=
     (1 - upg.armor * 0.14) *
     (1 - upg.security * 0.08) *
-    (1 - mods.integrityRate);
+    (1 - mods.integrityRate) *
+    difficulty;
   s.integrity -= decay * minutes;
   if (s.stress < 42 && s.aggression < 42) {
     s.integrity += 0.18 * minutes;
@@ -431,17 +440,66 @@ export function calmCreature(creature, toolId) {
   };
 }
 
+/** Сколько нажатий нужно до следующей стадии. */
+export function mutationTarget(creature) {
+  const index = Math.max(0, Math.min(1, (creature?.stage || 1) - 1));
+  return BALANCE.mutation.clickTargets[index] || 10;
+}
+
+export function mutationRemaining(creature) {
+  const target = mutationTarget(creature);
+  return Math.max(0, target - (creature?.mutationClicks || 0));
+}
+
+export function mutationPercent(creature) {
+  const target = mutationTarget(creature);
+  return Math.min(100, Math.round(((creature?.mutationClicks || 0) / target) * 100));
+}
+
+/**
+ * Кликер мутации. Каждое нажатие двигает шкалу; стресс и агрессия слегка растут.
+ * Финальное превращение запускается только когда шкала заполнена.
+ */
+export function clickMutation(creature) {
+  if (!creature?.stats) return { ok: false, reason: 'Нет существа' };
+  if (creature.stage >= 3) return { ok: false, reason: 'Финальная стадия' };
+  const target = mutationTarget(creature);
+  if ((creature.mutationClicks || 0) >= target) {
+    return { ok: true, ready: true, progress: 100, remaining: 0 };
+  }
+  creature.mutationClicks = Math.min(target, (creature.mutationClicks || 0) + 1);
+  creature.mutationProgress = Math.round((creature.mutationClicks / target) * 100);
+  creature.stats.stress = clamp(
+    creature.stats.stress + BALANCE.mutation.stressPerClick * (1 + creature.stage * 0.15)
+  );
+  creature.stats.aggression = clamp(
+    creature.stats.aggression + BALANCE.mutation.aggressionPerClick * (1 + creature.stage * 0.15)
+  );
+  creature.activity = activityFor(creature);
+  return {
+    ok: true,
+    ready: creature.mutationClicks >= target,
+    progress: creature.mutationProgress,
+    remaining: Math.max(0, target - creature.mutationClicks),
+  };
+}
+
 /** Открытие следующей стадии мутации. */
 export function mutateCreature(creature) {
   const def = creatureDef(creature);
   if (!def) return { ok: false, reason: 'Нет существа' };
   if (creature.stage >= 3) return { ok: false, reason: 'Достигнута финальная стадия' };
+  if ((creature.mutationClicks || 0) < mutationTarget(creature)) {
+    return { ok: false, reason: 'Шкала мутации не заполнена' };
+  }
 
   const nextStage = creature.stage + 1;
   const mutation = getMutation(def, nextStage);
   if (!mutation) return { ok: false, reason: 'Мутация недоступна' };
 
   creature.stage = nextStage;
+  creature.mutationClicks = 0;
+  creature.mutationProgress = 0;
   for (const [key, value] of Object.entries(mutation.stat || {})) {
     creature.stats[key] = clamp((creature.stats[key] || 0) + value);
   }

@@ -282,6 +282,12 @@ export class CameraWindow extends Phaser.GameObjects.Container {
 
     this.emptyOverlay.setVisible(isEmpty);
     if (isEmpty) {
+      const shopSlot = this.slot >= 2 && this.slot <= 4;
+      this.emptyText.setText(shopSlot ? 'ПРОТОКОЛ ЗАКРЫТ' : 'СЕКТОР НЕ ВВЕДЁН');
+      this.emptySub.setText(shopSlot ? 'КУПИТЬ В ПИТОМНИКЕ' : 'ОЖИДАНИЕ СУБЪЕКТА');
+      this.emptySub.setColor(shopSlot ? COLORS.purple : COLORS.dimmer);
+    }
+    if (isEmpty) {
       this.emptyText.setText('СЕКТОР НЕ ВВЕДЁН');
       this.emptySub.setText('ОЖИДАНИЕ СУБЪЕКТА');
       this.sprite.setVisible(false);

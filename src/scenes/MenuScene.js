@@ -1,5 +1,5 @@
 /**
- * Главное меню: новая смена, продолжение, архив концовок.
+ * Главное меню: новая игра, продолжение, архив концовок.
  */
 import { game as manager } from '../managers/GameManager.js';
 import { CREATURE_DEFS } from '../data/creatures.js';
@@ -10,9 +10,9 @@ import { Button, showToast } from '../ui/widgets.js';
 
 const PREVIEW_SLOTS = [
   { slot: 1, defId: 'bobek' },
-  { slot: 2, defId: 'pamydsa' },
-  { slot: 3, defId: 'mishutka' },
-  { slot: 4, defId: 'vodolazik' },
+  { slot: 2, defId: null, note: 'ПРОТОКОЛ ЗАКРЫТ' },
+  { slot: 3, defId: null, note: 'ПРОТОКОЛ ЗАКРЫТ' },
+  { slot: 4, defId: null, note: 'ПРОТОКОЛ ЗАКРЫТ' },
   { slot: 5, defId: null },
   { slot: 6, defId: null },
 ];
@@ -91,6 +91,8 @@ export class MenuScene extends Phaser.Scene {
       this.scene.start('Room', { slot: 1 });
     } else if (screen === 'market') {
       this.scene.start('Market');
+    } else if (screen === 'shop') {
+      this.scene.start('Shop');
     } else if (screen === 'intro') {
       this.scene.start('Intro');
     } else if (screen === 'guide') {
@@ -160,7 +162,7 @@ export class MenuScene extends Phaser.Scene {
       this,
       88,
       318,
-      'Шесть камер. Четыре существа. Восемь минут.\nКорми. Успокаивай. Отправляй на работу.\nИ не задавай лишних вопросов.',
+      'Шесть камер. Один подопытный. Семь минут.\nКорми. Покупай. Отправляй на работу.\nИ не задавай лишних вопросов.',
       { size: 17, color: COLORS.text, font: 'body', wrap: 430, lineSpacing: 5 }
     );
   }
@@ -221,7 +223,7 @@ export class MenuScene extends Phaser.Scene {
       this,
       x + 16,
       y + h - 24,
-      'СИГНАЛ 4/6  ·  ПИТАНИЕ 82%  ·  НАДЗОР-7 АКТИВЕН',
+      'СИГНАЛ 1/6  ·  ПИТАНИЕ 82%  ·  НАДЗОР-7 АКТИВЕН',
       { size: 7, color: COLORS.dimmer, font: 'display' }
     );
   }
@@ -286,9 +288,9 @@ export class MenuScene extends Phaser.Scene {
         font: 'display',
         origin: [0.5, 0.5],
       });
-      const sub = makeText(this, w / 2, h / 2 + 14, 'НЕТ СИГНАЛА', {
-        size: 12,
-        color: COLORS.red,
+      const sub = makeText(this, w / 2, h / 2 + 14, item.note || 'НЕТ СИГНАЛА', {
+        size: item.note ? 9 : 12,
+        color: item.note ? COLORS.purple : COLORS.red,
         font: 'body',
         origin: [0.5, 0.5],
       });
@@ -311,24 +313,24 @@ export class MenuScene extends Phaser.Scene {
     const x = 88;
     const width = 360;
 
-    this.newGameBtn = new Button(this, x, 438, width, 54, 'НОВАЯ СМЕНА', {
+    this.newGameBtn = new Button(this, x, 438, width, 54, 'НОВАЯ ИГРА', {
       variant: 'primary',
       size: 11,
       icon: 'contract',
-      sub: 'СМЕНА 01',
+      sub: 'ДЕНЬ 01',
       onClick: () => this.requestNewGame(),
     });
 
     this.continueBtn = new Button(this, x, 502, width, 54, 'ПРОДОЛЖИТЬ', {
       variant: 'default',
       size: 11,
-      sub: this.saveInfo ? `ДЕНЬ ${this.saveInfo.day} · СМЕНА ${this.saveInfo.shift}` : 'НЕТ ДАННЫХ',
+      sub: this.saveInfo ? `ДЕНЬ ${this.saveInfo.day}` : 'НЕТ ДАННЫХ',
       onClick: () => this.continueGame(),
     });
     this.continueBtn.setEnabled(Boolean(this.saveInfo));
 
     const endings = this.saveInfo?.meta?.unlockedEndings || [];
-    this.archiveBtn = new Button(this, x, 566, width, 42, `АРХИВ КОНЦОВОК [${endings.length}/5]`, {
+    this.archiveBtn = new Button(this, x, 566, width, 42, `АРХИВ КОНЦОВОК [${endings.length}/${Object.keys(ENDINGS).length}]`, {
       variant: 'ghost',
       size: 9,
       onClick: () => this.showArchive(endings),
@@ -352,7 +354,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     if (!this.saveInfo) {
-      makeText(this, x + 2, 676, 'Сохранение не найдено. Начните новую смену.', {
+      makeText(this, x + 2, 676, 'Сохранение не найдено. Начните новую игру.', {
         size: 13,
         color: COLORS.dimmer,
         font: 'body',
@@ -366,7 +368,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   buildFooter() {
-    makeText(this, 88, 764, 'ВЕРСИЯ 1.0  ·  СБОРКА ATD67-1987  ·  ВСЕ СМЕНЫ ЗАПИСЫВАЮТСЯ', {
+    makeText(this, 88, 764, 'ВЕРСИЯ 1.0  ·  СБОРКА ATD67-1987  ·  ВСЕ ДНИ ЗАПИСЫВАЮТСЯ', {
       size: 7,
       color: COLORS.dimmer,
       font: 'display',
@@ -396,7 +398,7 @@ export class MenuScene extends Phaser.Scene {
       this.scene.launch('Modal', {
         title: 'НОВАЯ ПАРТИЯ',
         body:
-          'Текущее сохранение будет стёрто. Все смены, контракты и мутации будут потеряны.\n\n' +
+          'Текущее сохранение будет стёрто. Весь прогресс, контракты и мутации будут потеряны.\n\n' +
           'Продолжить?',
         accent: COLORS.red,
         pause: false,
@@ -450,7 +452,7 @@ export class MenuScene extends Phaser.Scene {
     this.scene.launch('Modal', {
       title: 'АРХИВ КОНЦОВОК',
       body:
-        `ОТКРЫТО ${endings.length} ИЗ 5\n\n${lines.join('\n')}\n\n` +
+        `ОТКРЫТО ${endings.length} ИЗ ${Object.keys(ENDINGS).length}\n\n${lines.join('\n')}\n\n` +
         'Остальные записи повреждены или ещё не созданы.',
       accent: COLORS.purple,
       pause: false,

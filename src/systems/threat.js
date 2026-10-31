@@ -20,8 +20,8 @@ export function threatScore(creature) {
   return Math.round(clamp(value, 0, 160));
 }
 
-export function alarmThreshold(creature) {
-  return BALANCE.threat.alarmThreshold;
+export function alarmThreshold(creature, day = 1) {
+  return Math.max(42, BALANCE.threat.alarmThreshold - (Math.max(1, day) - 1) * BALANCE.difficulty.threatPerDay);
 }
 
 /** Длительность окна реакции при тревоге. */
@@ -35,11 +35,11 @@ export function alarmCountdown(creature) {
   return Math.round(clamp(seconds, 11, 45));
 }
 
-export function canRaiseAlarm(creature) {
+export function canRaiseAlarm(creature, day = 1) {
   return (
     creature &&
     ['idle', 'training'].includes(creature.status) &&
-    threatScore(creature) >= alarmThreshold(creature)
+    threatScore(creature) >= alarmThreshold(creature, day)
   );
 }
 
@@ -68,13 +68,13 @@ export function tickThreat(state, dt, rng) {
       state.alarmCooldown = Math.max(0, state.alarmCooldown - dt);
       return null;
     }
-    if (state.shiftTimeLeft > state.shiftDuration - 25) return null;
+    if (state.shiftTimeLeft > state.shiftDuration - 15) return null;
 
     for (const creature of state.creatures) {
       if (!['idle', 'training'].includes(creature.status)) continue;
-      if (!canRaiseAlarm(creature)) continue;
+      if (!canRaiseAlarm(creature, state.day)) continue;
       // Риск реализуется не мгновенно: у игрока есть несколько секунд до тревоги.
-      if (rng.chance(0.09 * dt)) {
+      if (rng.chance(0.2 * dt)) {
         startAlarm(state, creature);
         return { alarm: state.alarm, creature };
       }

@@ -22,7 +22,7 @@ export function rollEvent(state, rng) {
     title: 'СКАЧОК НАПРЯЖЕНИЯ',
     kind: 'warning',
     text: 'Скачок напряжения в сети бункера. Часть резерва потеряна.',
-    effects: { power: -14 },
+    effects: { power: -22 },
   }));
 
   if (active.length) {
@@ -33,7 +33,7 @@ export function rollEvent(state, rng) {
         title: 'СБОЙ КАМЕРЫ',
         kind: 'warning',
         text: `Камера сектора ${target.slot}: изображение потеряно.`,
-        effects: { camDown: { slot: target.slot, seconds: rng.int(10, 17) } },
+        effects: { camDown: { slot: target.slot, seconds: rng.int(18, 28) } },
       };
     });
   }

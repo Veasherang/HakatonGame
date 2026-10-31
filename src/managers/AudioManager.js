@@ -216,6 +216,43 @@ export class AudioManager {
     osc.stop(now + 2);
   }
 
+  /** Резкий скример: шумовой удар + падающий визг. */
+  scream() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    // Шумовой удар.
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer(0.55, 0.9);
+    const high = ctx.createBiquadFilter();
+    high.type = 'highpass';
+    high.frequency.value = 900;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.32, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+    noise.connect(high);
+    high.connect(noiseGain);
+    noiseGain.connect(this.master);
+    noise.start(now);
+
+    // Визг из трёх расстроенных пил.
+    [0, 18, -23].forEach((detune, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.detune.value = detune;
+      osc.frequency.setValueAtTime(1500 + index * 120, now);
+      osc.frequency.exponentialRampToValueAtTime(70, now + 0.75);
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(now);
+      osc.stop(now + 0.85);
+    });
+  }
+
   heartbeat() {
     this.beep(55, 0.12, 'sine', 0.16);
     setTimeout(() => this.beep(48, 0.14, 'sine', 0.12), 220);

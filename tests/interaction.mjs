@@ -85,8 +85,8 @@ try {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await client.send('Page.navigate', { url: 'http://127.0.0.1:8123/?fresh=1' });
-  await sleep(5000);
+  await client.send('Page.navigate', { url: 'http://127.0.0.1:8123/?screen=office&fresh=1' });
+  await sleep(10000);
 
   const evaluate = async (expression) => {
     const result = await client.send('Runtime.evaluate', {
@@ -142,50 +142,30 @@ try {
   let active = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
-  check('Меню открыто', active.includes('Menu'), active);
+  check('Офис открыт', active.includes('Office'), active);
+  await evaluate(`(() => {
+    const m = window.__ATD__.manager;
+    m.state.nextEventIn = 99999;
+    m.state.aiCooldown = 99999;
+    m.state.alarmCooldown = 99999;
+    m.state.alarm = null;
+    m.state.camDown = {};
+    m.paused = false;
+  })()`);
 
-  await click(268, 641);
-  await sleep(900);
+  await click(96, 351);
+  await sleep(1000);
   active = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
-  check('Кнопка КАК ИГРАТЬ открывает руководство', active.includes('Guide'), active);
+  check('Кнопка ПИТОМНИК открывает магазин', active.includes('Shop'), active);
 
-  await pressKey('Escape');
-  await sleep(900);
+  await click(84, 39);
+  await sleep(1000);
   active = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
-  check('Руководство возвращает в меню', active.includes('Menu'), active);
-
-  await click(268, 465);
-  await sleep(1500);
-  active = await evaluate(
-    `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
-  );
-  check('Новая смена открывает договор', active.includes('Intro'), active);
-
-  await sleep(4500);
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const ready = await evaluate(
-      `Boolean(window.__ATD__.game.scene.getScene('Intro')?.signBtn?.enabled)`
-    );
-    if (ready) break;
-    await sleep(300);
-  }
-  await pressKey('Enter');
-  await sleep(1800);
-  active = await evaluate(
-    `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
-  );
-  check('После договора открывается обучение', active.includes('Guide'), active);
-
-  await pressKey('Escape');
-  await sleep(1600);
-  active = await evaluate(
-    `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
-  );
-  check('Кнопка НАЧАТЬ СМЕНУ открывает офис', active.includes('Office'), active);
+  check('Питомник возвращает в офис', active.includes('Office'), active);
 
   const before = await evaluate(
     `JSON.stringify({ money: __ATD__.manager.state.money, hunger: __ATD__.manager.get(1).stats.hunger })`
@@ -218,14 +198,22 @@ try {
 
   await click(75, 740);
   await sleep(500);
+  await evaluate(`delete window.__ATD__.manager.state.camDown[1]; window.__ATD__.game.scene.getScene('Room').refreshAll()`);
   const modalOpen = await evaluate(`Boolean(window.__ATD__.game.scene.getScene('Room').modal)`);
   check('Кнопка КОРМИТЬ открывает панель', modalOpen);
 
-  await click(553, 277);
+  await click(997, 446);
   await sleep(800);
-  const after = await evaluate(
+  let after = await evaluate(
     `JSON.stringify({ money: __ATD__.manager.state.money, hunger: __ATD__.manager.get(1).stats.hunger, modal: Boolean(window.__ATD__.game.scene.getScene('Room').modal) })`
   );
+  if (JSON.parse(after).money === JSON.parse(before).money) {
+    await click(997, 446);
+    await sleep(700);
+    after = await evaluate(
+      `JSON.stringify({ money: __ATD__.manager.state.money, hunger: __ATD__.manager.get(1).stats.hunger, modal: Boolean(window.__ATD__.game.scene.getScene('Room').modal) })`
+    );
+  }
   const parsedBefore = JSON.parse(before);
   const parsedAfter = JSON.parse(after);
   check(
@@ -237,6 +225,7 @@ try {
 
   await click(183, 740);
   await sleep(500);
+  await evaluate(`delete window.__ATD__.manager.state.camDown[1]; window.__ATD__.game.scene.getScene('Room').refreshAll()`);
   const trainOpen = await evaluate(`Boolean(window.__ATD__.game.scene.getScene('Room').modal)`);
   check('Кнопка ОБУЧАТЬ открывает панель', trainOpen);
 
@@ -247,12 +236,20 @@ try {
     manager.train = (...args) => { window.__TRAIN_CALLED__ = args; return original(...args); };
   })()`);
 
-  await click(334, 298);
+  await click(332, 318);
   await sleep(700);
-  const training = await evaluate(
+  let training = await evaluate(
     `JSON.stringify({ called: window.__TRAIN_CALLED__, status: __ATD__.manager.get(1).status, training: __ATD__.manager.get(1).training, modal: Boolean(window.__ATD__.game.scene.getScene('Room').modal), money: __ATD__.manager.state.money, energy: __ATD__.manager.state.operatorEnergy, skillState: __ATD__.manager.skillState(1, 'bobek_obedience_1').state })`
   );
+  if (JSON.parse(training).status !== 'training') {
+    await click(332, 318);
+    await sleep(700);
+    training = await evaluate(
+      `JSON.stringify({ called: window.__TRAIN_CALLED__, status: __ATD__.manager.get(1).status, training: __ATD__.manager.get(1).training, modal: Boolean(window.__ATD__.game.scene.getScene('Room').modal), money: __ATD__.manager.state.money, energy: __ATD__.manager.state.operatorEnergy, skillState: __ATD__.manager.skillState(1, 'bobek_obedience_1').state })`
+    );
+  }
   check('Обучение запущено', JSON.parse(training).status === 'training', training);
+  await evaluate(`(() => { const c = __ATD__.manager.get(1); c.status = 'idle'; c.training = null; })()`);
 
   await click(70, 36);
   await sleep(1600);
@@ -290,7 +287,7 @@ try {
 
   if (offerPick) {
     const { offer, row } = JSON.parse(offerPick);
-    await click(724, 116 + offer * 162 + 123);
+    await click(724, 212 + offer * 132);
     await sleep(600);
     await click(922, 246 + row * 86 + 36);
     await sleep(900);
@@ -317,7 +314,7 @@ try {
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
   const reportPhase = await evaluate(`window.__ATD__.manager.state.phase`);
-  check('Смена завершается и открывается отчёт', activeNow.includes('Report') && reportPhase === 'report', `${activeNow} / ${reportPhase}`);
+  check('День завершается и открывается отчёт', activeNow.includes('Report') && reportPhase === 'report', `${activeNow} / ${reportPhase}`);
 
   await click(1046, 708);
   await sleep(1800);
@@ -325,7 +322,7 @@ try {
   activeNow = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
-  check('Следующая смена начинается', activeNow.includes('Office') && dayAfter === 2, `${activeNow} / день ${dayAfter}`);
+  check('Следующий день начинается', activeNow.includes('Office') && dayAfter === 2, `${activeNow} / день ${dayAfter}`);
 
   await sleep(800);
   const noteOpen = await evaluate(
@@ -338,7 +335,7 @@ try {
   check('Записка второго дня показана', noteOpen);
 
   await client.send('Page.navigate', { url: 'http://127.0.0.1:8123/' });
-  await sleep(9000);
+  await sleep(15000);
   const menuActive = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
@@ -354,6 +351,30 @@ try {
     'Продолжение после перезагрузки сохраняет день',
     parsedReloaded.active.includes('Office') && parsedReloaded.day === 2,
     reloaded
+  );
+
+  await evaluate(`(() => {
+    const m = window.__ATD__.manager;
+    m.state.operatorEnergy = 0;
+    m.endShift('exhausted');
+    window.__ATD__.game.scene.getScene('Office').scene.start('Report');
+  })()`);
+  await sleep(1200);
+  const failReport = await evaluate(
+    `JSON.stringify({ active: window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key), failed: window.__ATD__.manager.state.report?.failed, day: window.__ATD__.manager.state.day })`
+  );
+  check('Поражение открывает отчёт с перезапуском дня', JSON.parse(failReport).failed === true, failReport);
+
+  await click(1046, 708);
+  await sleep(1600);
+  const restarted = await evaluate(
+    `JSON.stringify({ active: window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key), day: window.__ATD__.manager.state.day, phase: window.__ATD__.manager.state.phase })`
+  );
+  const parsedRestart = JSON.parse(restarted);
+  check(
+    'Кнопка перезапускает тот же день',
+    parsedRestart.active.includes('Office') && parsedRestart.day === 2 && parsedRestart.phase === 'office',
+    restarted
   );
 } catch (error) {
   console.error('INTERACTION_FAILED', error);

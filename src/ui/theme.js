@@ -26,8 +26,8 @@ export const COLORS = {
 };
 
 export const FONT = {
-  display: '"Press Start 2P", monospace',
-  body: '"Pixelify Sans", "Courier New", monospace',
+  display: '"Rubik", "Segoe UI", sans-serif',
+  body: '"Rubik", "Segoe UI", sans-serif',
 };
 
 export const hexCss = (color) => `#${Number(color).toString(16).padStart(6, '0')}`;
@@ -62,7 +62,7 @@ export function textStyle(size = 16, color = COLORS.text, options = {}) {
   return {
     fontFamily: isDisplay ? FONT.display : FONT.body,
     fontSize: `${size}px`,
-    fontStyle: options.fontStyle || (isDisplay ? 'normal' : '600'),
+    fontStyle: options.fontStyle || (isDisplay ? '700' : '500'),
     color: hexCss(color),
     align: options.align || 'left',
     ...(options.wrap ? { wordWrap: { width: options.wrap, useAdvancedWrap: true } } : {}),

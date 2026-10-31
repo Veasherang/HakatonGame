@@ -57,6 +57,7 @@ export class IntroScene extends Phaser.Scene {
     this.fullText = INTRO_TEXT;
     this.revealed = 0;
     this.done = false;
+    this.started = false;
 
     this.typeEvent = this.time.addEvent({
       delay: 9,
@@ -68,7 +69,7 @@ export class IntroScene extends Phaser.Scene {
       variant: 'primary',
       size: 11,
       icon: 'contract',
-      sub: 'НАЧАТЬ СМЕНУ',
+      sub: 'НАЧАТЬ ДЕНЬ',
       onClick: () => this.startGame(),
     });
     this.signBtn.setEnabled(false);
@@ -130,8 +131,10 @@ export class IntroScene extends Phaser.Scene {
   }
 
   startGame() {
+    if (this.started) return;
+    this.started = true;
     manager.audio?.confirm?.();
-    manager.addLog('ТРУДОВОЙ ДОГОВОР ПОДПИСАН. СМЕНА НАЧАЛАСЬ.', 'sys');
+    manager.addLog('ТРУДОВОЙ ДОГОВОР ПОДПИСАН. ДЕНЬ НАЧАЛСЯ.', 'sys');
     manager.addLog('ОПЕРАТОР: НАЗНАЧЕН. ПРЕДЫДУЩИЙ ОПЕРАТОР: НЕ НАЙДЕН.', 'plot');
     manager.save(true);
     this.scene.start('Guide', { from: 'Office', firstRun: true });

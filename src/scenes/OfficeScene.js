@@ -259,7 +259,7 @@ export class OfficeScene extends Phaser.Scene {
     bar.add(g);
 
     const day = makeText(this, 20, 15, 'ДЕНЬ 01', { size: 10, color: COLORS.amber, font: 'display' });
-    const shift = makeText(this, 20, 37, 'СМЕНА 01', { size: 8, color: COLORS.dim, font: 'display' });
+    const shift = makeText(this, 20, 37, 'СЛОЖНОСТЬ ×1.00', { size: 8, color: COLORS.dim, font: 'display' });
     this.dayText = day;
     this.shiftText = shift;
     bar.add([day, shift]);
@@ -269,7 +269,7 @@ export class OfficeScene extends Phaser.Scene {
     div1.lineBetween(112, 14, 112, 70);
     bar.add(div1);
 
-    const timerLabel = makeText(this, 124, 9, 'ДО КОНЦА СМЕНЫ', {
+    const timerLabel = makeText(this, 124, 9, 'ДО КОНЦА ДНЯ', {
       size: 7,
       color: COLORS.dim,
       font: 'display',
@@ -335,8 +335,7 @@ export class OfficeScene extends Phaser.Scene {
       variant: 'danger',
       size: 8,
       onClick: () => this.confirmEndShift(),
-    });
-    bar.add(this.endShiftBtn);
+    });    bar.add(this.endShiftBtn);
   }
 
   buildLeftPanel() {
@@ -365,7 +364,7 @@ export class OfficeScene extends Phaser.Scene {
     });
     panel.add(this.energyBar);
 
-    this.coffeeBtn = new Button(this, 20, 144, 152, 32, 'КОФЕ +24 · 70₽', {
+    this.coffeeBtn = new Button(this, 20, 144, 152, 32, 'КОФЕ +24 · 180₽', {
       variant: 'ghost',
       size: 7,
       icon: 'coffee',
@@ -389,7 +388,7 @@ export class OfficeScene extends Phaser.Scene {
     });
     panel.add(this.powerBar);
 
-    this.generatorBtn = new Button(this, 20, 218, 152, 32, 'ГЕНЕРАТОР 120₽', {
+    this.generatorBtn = new Button(this, 20, 218, 152, 32, 'ГЕНЕРАТОР 1400₽', {
       variant: 'ghost',
       size: 7,
       icon: 'power',
@@ -419,7 +418,15 @@ export class OfficeScene extends Phaser.Scene {
     });
     panel.add(this.contractsBtn);
 
-    this.helpBtn = new Button(this, 20, 338, 152, 30, 'ИНСТРУКЦИЯ', {
+    this.shopBtn = new Button(this, 20, 336, 152, 30, 'ПИТОМНИК', {
+      variant: 'purple',
+      size: 7,
+      icon: 'mutate',
+      onClick: () => this.openShop(),
+    });
+    panel.add(this.shopBtn);
+
+    this.helpBtn = new Button(this, 20, 372, 152, 28, 'ИНСТРУКЦИЯ', {
       variant: 'ghost',
       size: 7,
       icon: 'note',
@@ -427,7 +434,7 @@ export class OfficeScene extends Phaser.Scene {
     });
     panel.add(this.helpBtn);
 
-    this.soundBtn = new Button(this, 20, 374, 152, 28, this.soundOn ? 'ЗВУК ВКЛ' : 'ЗВУК ВЫКЛ', {
+    this.soundBtn = new Button(this, 20, 406, 152, 26, this.soundOn ? 'ЗВУК ВКЛ' : 'ЗВУК ВЫКЛ', {
       variant: 'ghost',
       size: 7,
       icon: this.soundOn ? 'sound' : 'mute',
@@ -438,24 +445,24 @@ export class OfficeScene extends Phaser.Scene {
     // Панель тревоги / статуса.
     this.alarmBox = this.add.container(0, 0);
     this.alarmBoxG = this.add.graphics();
-    this.alarmBoxTitle = makeText(this, 20, 416, 'СТАТУС', {
+    this.alarmBoxTitle = makeText(this, 20, 442, 'СТАТУС', {
       size: 8,
       color: COLORS.dim,
       font: 'display',
     });
-    this.alarmBoxLine1 = makeText(this, 20, 436, '', {
+    this.alarmBoxLine1 = makeText(this, 20, 458, '', {
       size: 12,
       color: COLORS.text,
       font: 'body',
       wrap: 150,
     });
-    this.alarmBoxLine2 = makeText(this, 20, 462, '', {
+    this.alarmBoxLine2 = makeText(this, 20, 484, '', {
       size: 11,
       color: COLORS.dim,
       font: 'body',
       wrap: 150,
     });
-    this.alarmOpenBtn = new Button(this, 20, 500, 152, 38, 'ОТКРЫТЬ', {
+    this.alarmOpenBtn = new Button(this, 20, 512, 152, 34, 'ОТКРЫТЬ', {
       variant: 'danger',
       size: 8,
       onClick: () => {
@@ -471,7 +478,7 @@ export class OfficeScene extends Phaser.Scene {
     ]);
     panel.add(this.alarmBox);
 
-    this.shiftStatsText = makeText(this, 20, 562, '', {
+    this.shiftStatsText = makeText(this, 20, 556, '', {
       size: 10,
       color: COLORS.dim,
       font: 'body',
@@ -529,10 +536,10 @@ export class OfficeScene extends Phaser.Scene {
     divider.lineBetween(1108, 418, 1260, 418);
     panel.add(divider);
     panel.add(
-      makeText(this, 1108, 426, 'ЖУРНАЛ', { size: 7, color: COLORS.dim, font: 'display' })
+      makeText(this, 1108, 422, 'ЖУРНАЛ', { size: 7, color: COLORS.dim, font: 'display' })
     );
 
-    this.logList = new LogList(this, 1108, 440, 152, 188, { size: 12, maxLines: 11 });
+    this.logList = new LogList(this, 1108, 448, 152, 176, { size: 12, maxLines: 8 });
     panel.add(this.logList);
   }
 
@@ -579,6 +586,17 @@ export class OfficeScene extends Phaser.Scene {
       showToast(this, notice.text, { kind: notice.kind, y: 660 });
       if (notice.kind === 'danger' && manager.audio) manager.audio.error();
     });
+    on('energy-low', ({ level }) => {
+      showToast(
+        this,
+        level >= 2
+          ? 'ЭНЕРГИЯ НА ИСХОДЕ. ВЫПЕЙТЕ КОФЕ, ИНАЧЕ ДЕНЬ ПРОВАЛЕН.'
+          : 'ЭНЕРГИЯ НИЖЕ 30. СЛЕДИТЕ ЗА ШКАЛОЙ.',
+        { kind: level >= 2 ? 'danger' : 'warning', y: 660, duration: 4200 }
+      );
+      this.cameras.main.shake(level >= 2 ? 220 : 100, level >= 2 ? 0.006 : 0.002);
+      manager.audio?.error?.();
+    });
 
     on('alarm', (alarm) => this.handleAlarm(alarm, true));
     on('alarm-cleared', () => this.clearAlarm());
@@ -588,7 +606,7 @@ export class OfficeScene extends Phaser.Scene {
       this.scene.start('Report');
     });
     on('blackout', () => {
-      this.showToast('ПИТАНИЕ ОТКЛЮЧЕНО. КАМЕРЫ НЕ РАБОТАЮТ.', 'danger');
+      showToast(this, 'ПИТАНИЕ ОТКЛЮЧЕНО. КАМЕРЫ НЕ РАБОТАЮТ.', { kind: 'danger', y: 660 });
       this.refreshAll();
     });
     on('contract-done', (result) => {
@@ -634,7 +652,7 @@ export class OfficeScene extends Phaser.Scene {
     if (!state || !this.timerText) return;
 
     this.dayText.setText(`ДЕНЬ ${String(state.day).padStart(2, '0')}`);
-    this.shiftText.setText(`СМЕНА ${String(state.shift).padStart(2, '0')}`);
+    this.shiftText.setText(`СЛОЖНОСТЬ ×${(1 + (state.day - 1) * 0.13).toFixed(2)}`);
     this.timerText.setText(formatTime(state.shiftTimeLeft));
     this.timerText.setColor(state.shiftTimeLeft <= 60 ? COLORS.red : COLORS.white);
     this.timerBar.clear();
@@ -655,7 +673,13 @@ export class OfficeScene extends Phaser.Scene {
     this.offersText.setText(String(state.offers?.length || 0));
     this.offersText.setColor(state.offers?.length ? COLORS.amber : COLORS.dimmer);
 
-    this.energyBar.setValue(state.operatorEnergy, state.operatorEnergy < 25 ? COLORS.red : COLORS.cyan);
+    this.energyBar.setValue(
+      state.operatorEnergy,
+      state.operatorEnergy < 30 ? COLORS.red : COLORS.cyan
+    );
+    this.energyBar.labelObj.setText(
+      state.operatorEnergy < 30 ? 'ЭНЕРГИЯ · МАЛО' : 'ЭНЕРГИЯ'
+    );
     this.powerBar.setValue(state.power, state.power < 30 ? COLORS.red : COLORS.green);
     this.powerBar.labelObj.setText(
       state.blackout ? 'ПИТАНИЕ · АВАРИЯ' : 'ПИТАНИЕ БУНКЕРА'
@@ -701,14 +725,14 @@ export class OfficeScene extends Phaser.Scene {
         0,
         ...state.creatures.filter((c) => c.defId && ['idle', 'training'].includes(c.status)).map(threatScore)
       );
-      this.alarmBoxLine2.setText(`МАКС. РИСК: ${Math.round(maxThreat)} / 74`);
+      this.alarmBoxLine2.setText(`МАКС. РИСК: ${Math.round(maxThreat)} / 62`);
       this.alarmBoxLine2.setColor(maxThreat >= 60 ? COLORS.amber : COLORS.dim);
       this.alarmOpenBtn.setVisible(false);
     }
 
     this.alarmBoxG.clear();
     if (state.alarm) {
-      drawPanel(this.alarmBoxG, 16, 408, 160, 142, {
+      drawPanel(this.alarmBoxG, 16, 434, 160, 118, {
         fill: 0x1e0c09,
         stroke: COLORS.red,
         alpha: 0.95,
@@ -716,7 +740,7 @@ export class OfficeScene extends Phaser.Scene {
         cornerSize: 8,
       });
     } else {
-      drawPanel(this.alarmBoxG, 16, 408, 160, 142, {
+      drawPanel(this.alarmBoxG, 16, 434, 160, 118, {
         fill: 0x0a1113,
         stroke: COLORS.line,
         alpha: 0.9,
@@ -724,8 +748,8 @@ export class OfficeScene extends Phaser.Scene {
       });
     }
 
-    this.coffeeBtn.setEnabled(state.coffeeUsed < 3 && state.money >= 70);
-    this.generatorBtn.setEnabled(state.money >= 120);
+    this.coffeeBtn.setEnabled(state.coffeeUsed < 3 && state.money >= 180);
+    this.generatorBtn.setEnabled(state.money >= 1400);
   }
 
   refreshAi() {
@@ -832,26 +856,30 @@ export class OfficeScene extends Phaser.Scene {
 
   openRoom(slot) {
     if (!manager.state || manager.state.phase !== 'office') return;
+    if (manager.get(slot)?.status === 'empty' && slot <= 4) {
+      manager.audio?.ui?.();
+      this.scene.start('Shop');
+      return;
+    }
     manager.audio?.glitch?.();
-    this.cameras.main.fadeOut(170, 0, 0, 0);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start('Room', { slot });
-    });
+    this.scene.start('Room', { slot });
   }
 
   openMarket() {
     manager.audio?.ui?.();
-    this.cameras.main.fadeOut(150, 0, 0, 0);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start('Market');
-    });
+    this.scene.start('Market');
+  }
+
+  openShop() {
+    manager.audio?.ui?.();
+    this.scene.start('Shop');
   }
 
   confirmEndShift() {
     this.scene.launch('Modal', {
-      title: 'ЗАВЕРШИТЬ СМЕНУ?',
+      title: 'ЗАВЕРШИТЬ ДЕНЬ?',
       body:
-        'Смена будет завершена досрочно. Вы получите жалование и биомассу, но не успеете выполнить всё запланированное.\n\n' +
+        'День будет завершён досрочно. Вы получите жалование и биомассу, но не успеете выполнить всё запланированное.\n\n' +
         'Существа на контрактах продолжат работу.',
       accent: COLORS.amber,
       pause: true,
@@ -873,16 +901,14 @@ export class OfficeScene extends Phaser.Scene {
 
   showHelp() {
     manager.audio?.ui?.();
-    this.cameras.main.fadeOut(140, 0, 0, 0);
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-      this.scene.start('Guide', { from: 'Office' });
-    });
+    this.scene.start('Guide', { from: 'Office' });
   }
 
   openPause() {
+    const state = manager.state;
     this.scene.launch('Modal', {
       title: 'ПАУЗА',
-      body: `День ${manager.state?.day}, смена ${manager.state?.shift}.\nВремя смены остановлено.`,
+      body: `День ${state?.day}. Время дня остановлено.\n\nСложность: ×${(1 + ((state?.day || 1) - 1) * 0.13).toFixed(2)}.`,
       accent: COLORS.cyan,
       pause: true,
       typewriter: false,

@@ -7,22 +7,22 @@ export const BALANCE = {
   design: { width: 1280, height: 800 },
 
   shift: {
-    durationSec: 480,          // 8 минут; максимум по концепции — 10 минут
+    durationSec: 420,          // 7 минут на день
     energyMax: 100,
-    energyRegenPerMin: 2.4,
-    lowEnergy: 25,
-    coffee: { cost: 70, energy: 24, limitPerShift: 3 },
+    energyRegenPerMin: 3.2,
+    lowEnergy: 30,
+    coffee: { cost: 180, energy: 24, limitPerShift: 3 },
     speeds: [1, 2],
   },
 
   economy: {
-    startMoney: 1500,
-    startBiomass: 15,
+    startMoney: 2600,
+    startBiomass: 24,
     startReputation: 50,
-    baseSalary: 240,
-    salaryPerReputation: 2.4,
-    replacementCost: 900,
-    generatorCost: 120,
+    baseSalary: 600,
+    salaryPerReputation: 4,
+    replacementCost: 2400,
+    generatorCost: 1400,
     generatorPower: 45,
     emergencyCost: 0,
     maxReputation: 100,
@@ -30,24 +30,24 @@ export const BALANCE = {
 
   power: {
     max: 100,
-    drainBasePerMin: 0.8,
-    drainPerUpgradePerMin: 0.06,
-    blackoutStressPerMin: 0.9,
-    blackoutIntegrityPerMin: 0.5,
+    drainBasePerMin: 2.0,
+    drainPerUpgradePerMin: 0.1,
+    blackoutStressPerMin: 1.4,
+    blackoutIntegrityPerMin: 0.8,
     restartPower: 45,
   },
 
   creature: {
-    hungerRate: 3.3,
-    cleanlinessRate: 2.3,
-    stressBase: 1.15,
-    energyRate: 1.7,
-    aggressionBase: 0.35,
-    healthRegen: 0.75,
-    healthDecay: 0.9,
-    integrityBaseDecay: 0.15,
-    loyaltyGain: 0.25,
-    loyaltyLoss: 0.5,
+    hungerRate: 4.8,
+    cleanlinessRate: 3.6,
+    stressBase: 1.7,
+    energyRate: 2.5,
+    aggressionBase: 0.55,
+    healthRegen: 0.9,
+    healthDecay: 1.4,
+    integrityBaseDecay: 0.28,
+    loyaltyGain: 0.2,
+    loyaltyLoss: 0.7,
     // Пороговые значения, после которых начинаются проблемы.
     hungerBad: 70,
     hungerCritical: 85,
@@ -58,61 +58,84 @@ export const BALANCE = {
     integrityBad: 55,
     integrityCritical: 30,
     energyLow: 22,
-    starvationDamage: 0.9,
-    stressDamage: 0.7,
-    // Пассивное производство биомассы существом (единиц за смену).
+    starvationDamage: 1.3,
+    stressDamage: 1.1,
+    // Пассивное производство биомассы существом (единиц за день).
     biomassPerShift: 1.2,
     maxLevel: 12,
     xpPerLevel: 120,
   },
 
+  difficulty: {
+    perDay: 0.13,
+    eventSpeedPerDay: 0.05,
+    threatPerDay: 1.4,
+    contractPerDay: 1.6,
+    minIntervalScale: 0.45,
+  },
+
+  interference: {
+    clearCost: 360,
+    clearEnergy: 7,
+    baseSeconds: 16,
+  },
+
   training: {
-    energyCost: 8,
+    energyCost: 10,
     baseTime: 26,
     levelXp: 24,
+    priceScale: 2.4,
+  },
+
+  mutation: {
+    // Сколько нажатий нужно до следующей стадии.
+    clickTargets: [10, 14],
+    energyCost: 12,
+    stressPerClick: 0.35,
+    aggressionPerClick: 0.2,
   },
 
   contract: {
-    minDuration: 70,
-    maxDuration: 190,
+    minDuration: 55,
+    maxDuration: 150,
     minReadiness: 30,
-    offersPerShift: 4,
-    payScalePerDay: 0.06,
+    offersPerShift: 5,
+    payScalePerDay: 0.08,
     payScalePerRep: 0.008,
     mutationPayBonus: 0.35,
-    fatigueStress: 16,
-    unseenRisk: 0.08,
+    fatigueStress: 18,
+    unseenRisk: 0.1,
   },
 
   threat: {
-    alarmThreshold: 74,
-    alarmCooldown: 40,       // секунд спокойствия после отбоя
-    countdownBase: 26,
-    countdownPerAdaptation: 3.2,
-    countdownPerSecurity: 3.4,
+    alarmThreshold: 62,
+    alarmCooldown: 22,
+    countdownBase: 19,
+    countdownPerAdaptation: 2.6,
+    countdownPerSecurity: 2.6,
     countdownPerSensor: 1.1,
-    effectiveToolStress: 18,
-    effectiveToolAggression: 22,
-    wrongToolStress: 9,
-    wrongToolAggression: 12,
-    escapeRepPenalty: 8,
-    escapeMoneyPenalty: 160,
+    effectiveToolStress: 20,
+    effectiveToolAggression: 24,
+    wrongToolStress: 11,
+    wrongToolAggression: 14,
+    escapeRepPenalty: 12,
+    escapeMoneyPenalty: 400,
     escapeAdaptation: 1,
-    escapeLoyaltyPenalty: 8,
-    recaptureIntegrity: 38,
+    escapeLoyaltyPenalty: 10,
+    recaptureIntegrity: 30,
   },
 
   events: {
-    firstDelay: 42,
-    intervalMin: 46,
-    intervalMax: 82,
-    aiIntervalMin: 38,
-    aiIntervalMax: 66,
+    firstDelay: 18,
+    intervalMin: 24,
+    intervalMax: 44,
+    aiIntervalMin: 14,
+    aiIntervalMax: 28,
   },
 
   save: {
     key: 'atd67_save_v1',
-    version: 3,
+    version: 4,
     autosaveSec: 15,
     legacyKeys: ['atd67_save'],
   },
@@ -148,6 +171,17 @@ export const STAT_META = {
 
 export const clamp = (value, min = 0, max = 100) =>
   Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
+
+/** Во сколько раз день сложнее первого. */
+export const difficultyForDay = (day) =>
+  1 + Math.max(0, (Number(day) || 1) - 1) * BALANCE.difficulty.perDay;
+
+/** Ускорение таймеров событий/ИИ с каждым днём. */
+export const intervalScaleForDay = (day) =>
+  Math.max(
+    BALANCE.difficulty.minIntervalScale,
+    1 - Math.max(0, (Number(day) || 1) - 1) * BALANCE.difficulty.eventSpeedPerDay
+  );
 
 export const uid = (prefix = 'id') =>
   `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

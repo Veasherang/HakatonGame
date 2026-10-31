@@ -99,33 +99,33 @@ export class EndingScene extends Phaser.Scene {
       const col = index % 2;
       const row = Math.floor(index / 2);
       const x = 130 + col * 510;
-      const y = 186 + row * 248;
+      const y = 176 + row * 162;
       const color = choice.enabled ? COLORS.amber : COLORS.line;
 
       const g = this.add.graphics();
-      drawPanel(g, x, y, 480, 224, {
+      drawPanel(g, x, y, 480, 148, {
         fill: choice.enabled ? 0x0d1618 : 0x080e10,
         stroke: color,
         alpha: 0.97,
         cornerSize: 10,
       });
       g.fillStyle(choice.enabled ? COLORS.amber : COLORS.dimmer, 0.9);
-      g.fillRect(x, y, 4, 224);
+      g.fillRect(x, y, 4, 148);
 
-      makeText(this, x + 20, y + 16, choice.label, {
+      makeText(this, x + 18, y + 8, choice.label, {
         size: 10,
         color: choice.enabled ? COLORS.text : COLORS.dimmer,
         font: 'display',
         wrap: 430,
       });
-      makeText(this, x + 20, y + 50, choice.desc, {
-        size: 13,
+      makeText(this, x + 18, y + 30, choice.desc, {
+        size: 12,
         color: choice.enabled ? COLORS.dim : COLORS.dimmer,
         font: 'body',
         wrap: 430,
-        lineSpacing: 3,
+        lineSpacing: 2,
       });
-      makeText(this, x + 20, y + 128, choice.hint, {
+      makeText(this, x + 18, y + 82, choice.hint, {
         size: 11,
         color: choice.enabled ? COLORS.cyan : COLORS.dimmer,
         font: 'body',
@@ -133,7 +133,7 @@ export class EndingScene extends Phaser.Scene {
         lineSpacing: 2,
       });
 
-      const button = new Button(this, x + 20, y + 174, 200, 36, choice.enabled ? 'ВЫБРАТЬ' : 'НЕДОСТУПНО', {
+      const button = new Button(this, x + 18, y + 108, 190, 30, choice.enabled ? 'ВЫБРАТЬ' : 'НЕДОСТУПНО', {
         variant: choice.enabled ? 'primary' : 'ghost',
         size: 8,
         enabled: choice.enabled,
@@ -293,7 +293,7 @@ export class EndingScene extends Phaser.Scene {
       },
     });
 
-    makeText(this, 640, 756, `ДЕНЬ ${result.day} · ОТКРЫТО КОНЦОВОК: ${this.state.meta.unlockedEndings.length}/5`, {
+    makeText(this, 640, 756, `ДЕНЬ ${result.day} · ОТКРЫТО КОНЦОВОК: ${this.state.meta.unlockedEndings.length}/6`, {
       size: 8,
       color: COLORS.dimmer,
       font: 'display',

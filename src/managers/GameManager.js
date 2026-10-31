@@ -5,8 +5,14 @@
  *
  * Модуль не импортирует Phaser и работает в Node (используется в тестах).
  */
-import { BALANCE, clamp } from '../config/balance.js';
-import { EMPTY_SLOTS, getCreatureDef, getMutation, getSkillNode } from '../data/creatures.js';
+import { BALANCE, clamp, difficultyForDay, intervalScaleForDay } from '../config/balance.js';
+import {
+  CREATURE_SHOP,
+  EMPTY_SLOTS,
+  getCreatureDef,
+  getMutation,
+  getSkillNode,
+} from '../data/creatures.js';
 import { getFood, foodsFor } from '../data/food.js';
 import { UPGRADES, upgradeCost, maxIntegrity } from '../data/upgrades.js';
 import { getCareTool } from '../data/tools.js';
@@ -19,12 +25,15 @@ import {
   beginTraining,
   biomassPerShift,
   calmCreature,
+  clickMutation as clickMutationProgress,
   completeTraining,
   createCreature,
   createEmptySlot,
   creatureDef,
   feedCreature,
   mutateCreature,
+  mutationPercent,
+  mutationRemaining,
   readiness,
   skillNodeState,
   tickCreature,
@@ -40,18 +49,13 @@ import {
   pendingNote,
   unlockNote,
 } from '../systems/plot.js';
-import { advanceDay, buildReport, computeSalary } from '../systems/report.js';
+import { advanceDay, buildReport, computeSalary, FAILURE_REASONS } from '../systems/report.js';
 import { defend as defendThreat, markEscaped, tickThreat } from '../systems/threat.js';
 import { createRng } from '../utils/rand.js';
 import { Emitter } from '../utils/emitter.js';
 import { SaveManager } from './SaveManager.js';
 
-const SLOT_DEFS = {
-  1: 'bobek',
-  2: 'pamydsa',
-  3: 'mishutka',
-  4: 'vodolazik',
-};
+const cloneState = (state) => JSON.parse(JSON.stringify(state));
 
 function createShiftStats(state) {
   return {
@@ -86,10 +90,15 @@ export class GameManager {
      ====================================================================== */
 
   createState(seed) {
-    const defs = Object.values(SLOT_DEFS);
-    const creatures = defs.map((defId, index) => createCreature(defId, index + 1));
-    for (const empty of EMPTY_SLOTS) {
-      creatures.push(createEmptySlot(empty.slot, empty.sector, empty.note));
+    const creatures = [createCreature('bobek', 1)];
+    const emptySlots = [
+      [2, 'СЕКТОР 02', 'Протокол 02 закрыт. Субъект можно приобрести в питомнике.'],
+      [3, 'СЕКТОР 03', 'Протокол 03 закрыт. Субъект можно приобрести в питомнике.'],
+      [4, 'СЕКТОР 04', 'Протокол 04 закрыт. Субъект можно приобрести в питомнике.'],
+      ...EMPTY_SLOTS.map((slot) => [slot.slot, slot.sector, slot.note]),
+    ];
+    for (const [slot, sector, note] of emptySlots) {
+      creatures.push(createEmptySlot(slot, sector, note));
     }
     creatures.sort((a, b) => a.slot - b.slot);
 
@@ -117,13 +126,15 @@ export class GameManager {
       alarmCooldown: 0,
       camDown: {},
       nextEventIn: BALANCE.events.firstDelay,
-      aiCooldown: 24,
+      aiCooldown: 10,
       autosaveTimer: 0,
       coffeeUsed: 0,
+      energyWarned: 0,
       blackout: false,
       plot: createPlot(),
       stats: {
         shiftsDone: 0,
+        daysDone: 0,
         contractsDone: 0,
         escapes: 0,
         moneyEarned: 0,
@@ -140,11 +151,13 @@ export class GameManager {
       escape: null,
       ending: null,
       endingResult: null,
+      daySnapshot: null,
       settings: { sound: true },
     };
 
     state.shiftStats = createShiftStats(state);
     state.offers = generateOffers(state, this.rng);
+    state.daySnapshot = this.captureDay(state);
     return state;
   }
 
@@ -155,7 +168,7 @@ export class GameManager {
     this.paused = false;
     this.lastSaveAt = 0;
     this.addLog('СИСТЕМА АТД-67 АКТИВИРОВАНА', 'sys');
-    this.addLog('ОПЕРАТОР ДОПУЩЕН К СМЕНЕ. ЖУРНАЛ ОТКРЫТ.', 'sys');
+    this.addLog('ДЕНЬ 01. ОПЕРАТОР ДОПУЩЕН. В БУНКЕРЕ ТОЛЬКО БОБЭК.', 'sys');
     this.addAi('ДОБРО ПОЖАЛОВАТЬ, ОПЕРАТОР. ОСМОТРИ КАМЕРЫ. НЕ ОТКРЫВАЙ ЛИШНЕГО.');
     this.save(true);
     this.bus.emit('new-game', this.state);
@@ -169,8 +182,51 @@ export class GameManager {
     this.rng = createRng(result.state.seed || Date.now());
     this.acc = 0;
     this.paused = false;
+    if (!this.state.daySnapshot) this.state.daySnapshot = this.captureDay(this.state);
     this.bus.emit('loaded', this.state);
     return result;
+  }
+
+  /** Снимок начала дня. Позволяет перезапустить день после поражения. */
+  captureDay(state) {
+    const copy = cloneState(state);
+    copy.daySnapshot = null;
+    copy.report = null;
+    copy.ending = null;
+    copy.endingResult = null;
+    copy.escape = null;
+    copy.phase = 'office';
+    return copy;
+  }
+
+  restartDay() {
+    const state = this.state;
+    if (!state?.daySnapshot) return false;
+    const meta = state.meta;
+    const settings = state.settings;
+    const snapshot = cloneState(state.daySnapshot);
+    snapshot.meta = meta;
+    snapshot.settings = settings;
+    snapshot.daySnapshot = cloneState(state.daySnapshot);
+    snapshot.phase = 'office';
+    snapshot.report = null;
+    snapshot.ending = null;
+    snapshot.endingResult = null;
+    snapshot.escape = null;
+    snapshot.alarm = null;
+    snapshot.escape = null;
+    snapshot.camDown = {};
+    snapshot.shiftTimeLeft = snapshot.shiftDuration;
+    snapshot.operatorEnergy = BALANCE.shift.energyMax;
+    snapshot.energyWarned = 0;
+    this.state = snapshot;
+    this.acc = 0;
+    this.paused = false;
+    this.addLog(`ДЕНЬ ${this.state.day} ПЕРЕЗАПУЩЕН. ПОСЛЕДСТВИЯ ПОРАЖЕНИЯ СБРОШЕНЫ.`, 'danger');
+    this.addAi('ПРОТОКОЛ ПЕРЕЗАПУСКА ПРИНЯТ. НЕ ПОТЕРЯЙ ЕГО СНОВА.');
+    this.save(true);
+    this.bus.emit('day-restart', this.state);
+    return true;
   }
 
   hasSave() {
@@ -249,8 +305,9 @@ export class GameManager {
     );
 
     const messages = [];
+    const difficulty = difficultyForDay(state.day);
     for (const creature of state.creatures) {
-      tickCreature(creature, dt, { blackout: state.blackout }, messages);
+      tickCreature(creature, dt, { blackout: state.blackout, difficulty }, messages);
       if (creature.training) {
         creature.training.timeLeft -= dt;
         if (creature.training.timeLeft <= 0) {
@@ -281,20 +338,26 @@ export class GameManager {
     if (state.nextEventIn <= 0) {
       const event = rollEvent(state, this.rng);
       this.applyEvent(event);
-      state.nextEventIn = this.rng.int(BALANCE.events.intervalMin, BALANCE.events.intervalMax);
+      state.nextEventIn =
+        this.rng.int(BALANCE.events.intervalMin, BALANCE.events.intervalMax) *
+        intervalScaleForDay(state.day);
     }
 
     state.aiCooldown -= dt;
     if (state.aiCooldown <= 0) {
       const line = rollAiLine(state, this.rng);
       this.handleAiLine(line);
-      state.aiCooldown = this.rng.int(BALANCE.events.aiIntervalMin, BALANCE.events.aiIntervalMax);
+      state.aiCooldown =
+        this.rng.int(BALANCE.events.aiIntervalMin, BALANCE.events.aiIntervalMax) *
+        intervalScaleForDay(state.day);
     }
 
     for (const message of messages) {
       this.addLog(message.text, message.kind);
       this.bus.emit('creature', { slot: message.slot });
     }
+
+    this.checkEnergyWarning();
 
     if (state.operatorEnergy <= 0) {
       this.endShift('exhausted');
@@ -351,6 +414,34 @@ export class GameManager {
         line.camDown.seconds
       );
       this.bus.emit('creature', { slot: line.camDown.slot });
+    }
+    if (line.stress && line.slot) {
+      const creature = this.get(line.slot);
+      if (creature?.stats) {
+        creature.stats.stress = clamp(creature.stats.stress + line.stress);
+        this.bus.emit('creature', { slot: line.slot });
+      }
+    }
+  }
+
+  /** Предупреждения о низкой энергии оператора. */
+  checkEnergyWarning() {
+    const state = this.state;
+    if (!state) return;
+    const energy = state.operatorEnergy;
+    if (energy > 36) {
+      state.energyWarned = 0;
+      return;
+    }
+    if (energy <= 15 && (state.energyWarned || 0) < 2) {
+      state.energyWarned = 2;
+      this.addLog('КРИТИЧЕСКАЯ ЭНЕРГИЯ ОПЕРАТОРА. НУЖЕН КОФЕ.', 'danger');
+      this.bus.emit('energy-low', { energy, level: 2 });
+      return;
+    }
+    if (energy <= 30 && (state.energyWarned || 0) < 1) {
+      state.energyWarned = 1;
+      this.bus.emit('energy-low', { energy, level: 1 });
     }
   }
 
@@ -449,6 +540,9 @@ export class GameManager {
     if (creature.status === 'terminated') return { ok: false, reason: 'Существо утилизировано' };
     if (creature.status === 'escaped') return { ok: false, reason: 'Существо сбежало' };
     if (creature.status === 'contract') return { ok: false, reason: 'Существо на контракте' };
+    if ((this.state?.camDown?.[slot] || 0) > 0) {
+      return { ok: false, reason: 'ПОМЕХИ НА КАМЕРЕ. ВЗАИМОДЕЙСТВИЕ ЗАБЛОКИРОВАНО.' };
+    }
     return { ok: true, creature };
   }
 
@@ -488,11 +582,12 @@ export class GameManager {
     const state = this.state;
     if (!state) return false;
     if (state.operatorEnergy < amount) {
-      this.notify('Не хватает энергии оператора. Кофе или завершение смены.', 'danger');
+      this.notify('Не хватает энергии оператора. Кофе или завершение дня.', 'danger');
       return false;
     }
     state.operatorEnergy = clamp(state.operatorEnergy - amount);
     this.bus.emit('energy', state.operatorEnergy);
+    this.checkEnergyWarning();
     return true;
   }
 
@@ -625,6 +720,9 @@ export class GameManager {
       return { ok: false, reason: 'Тревоги нет' };
     }
     if (state.alarm.slot !== slot) return { ok: false, reason: 'Тревога в другом секторе' };
+    if ((state.camDown[slot] || 0) > 0) {
+      return { ok: false, reason: 'ПОМЕХИ НА КАМЕРЕ. СНАЧАЛА ВОССТАНОВИТЕ СВЯЗЬ.' };
+    }
     const creature = this.get(slot);
     const tool = getCareTool(toolId);
     if (!creature || !tool) return { ok: false, reason: 'Недоступно' };
@@ -714,6 +812,110 @@ export class GameManager {
     return { ok: true, level: level + 1 };
   }
 
+  /** Один клик по шкале мутации. */
+  mutationClick(slot) {
+    const state = this.state;
+    if (!state || state.phase !== 'office') return { ok: false };
+    const usable = this.usable(slot);
+    if (!usable.ok) {
+      this.notify(usable.reason, 'warning');
+      return usable;
+    }
+    const creature = usable.creature;
+    const def = this.def(slot);
+    if (creature.stage >= 3) return { ok: false, reason: 'Финальная стадия' };
+    const result = clickMutationProgress(creature);
+    if (!result.ok) return result;
+    this.bus.emit('creature', { slot });
+    this.bus.emit('mutation-progress', { slot, ...result });
+    if (result.ready) {
+      this.notify(`${def.name}: ШКАЛА МУТАЦИИ ЗАПОЛНЕНА. МОЖНО ЗАВЕРШИТЬ.`, 'good');
+      this.addLog(`${def.name}: ШКАЛА МУТАЦИИ 100%. НУЖНА БИОМАССА ДЛЯ ПРЕВРАЩЕНИЯ.`, 'plot');
+    }
+    return result;
+  }
+
+  mutationInfo(slot) {
+    const creature = this.get(slot);
+    return {
+      progress: mutationPercent(creature),
+      remaining: mutationRemaining(creature),
+      ready: mutationRemaining(creature) <= 0,
+    };
+  }
+
+  /** Убрать помехи на камере, чтобы вернуть доступ к комнате. */
+  clearInterference(slot) {
+    const state = this.state;
+    if (!state || state.phase !== 'office') return { ok: false };
+    if (!(state.camDown[slot] > 0)) return { ok: false, reason: 'Помех нет' };
+    if (!this.spend(BALANCE.interference.clearCost)) return { ok: false, reason: 'Нет денег' };
+    if (!this.useEnergy(BALANCE.interference.clearEnergy)) {
+      this.refund(BALANCE.interference.clearCost);
+      return { ok: false, reason: 'Нет энергии' };
+    }
+    delete state.camDown[slot];
+    this.addLog(`СЕКТОР ${slot}: ПОМЕХИ УСТРАНЕНЫ. СВЯЗЬ ВОССТАНОВЛЕНА.`, 'good');
+    this.bus.emit('interference-cleared', { slot });
+    this.bus.emit('creature', { slot });
+    this.save();
+    return { ok: true };
+  }
+
+  /** Купить существо в питомнике. */
+  buyCreature(defId) {
+    const state = this.state;
+    if (!state || state.phase !== 'office') return { ok: false };
+    const offer = CREATURE_SHOP.find((item) => item.id === defId);
+    if (!offer) return { ok: false, reason: 'Лот не найден' };
+    if (offer.start) return { ok: false, reason: 'Уже в бункере' };
+    const existing = state.creatures.find((item) => item.defId === defId);
+    if (existing) return { ok: false, reason: 'Этот субъект уже куплен' };
+    if (state.day < offer.unlockDay) {
+      return { ok: false, reason: `Протокол откроется в день ${offer.unlockDay}` };
+    }
+    const slotCreature = this.get(offer.slot);
+    if (!slotCreature || slotCreature.status !== 'empty') {
+      return { ok: false, reason: 'Сектор занят' };
+    }
+    if (!this.spend(offer.price)) return { ok: false, reason: 'Нет денег' };
+
+    const creature = createCreature(defId, offer.slot);
+    creature.purchasedDay = state.day;
+    const index = state.creatures.findIndex((item) => item.slot === offer.slot);
+    state.creatures[index] = creature;
+    state.plot.flags[`bought_${defId}`] = true;
+    this.addLog(`ПИТОМНИК: СУБЪЕКТ ${offer.slot} ПРИНЯТ В БУНКЕР.`, 'good');
+
+    if (defId === 'vodolazik') {
+      state.plot.flags.vodolazik_revealed = true;
+      this.addLog('СУБЪЕКТ 07 — ЧЕЛОВЕК. ЭКСПЕРИМЕНТЫ БОЛЬШЕ НЕ ОГРАНИЧЕНЫ ЖИВОТНЫМИ.', 'plot');
+      this.addAi('ТЫ КУПИЛ ЧЕЛОВЕКА. ЭТО НЕ МЕНЯЕТ ПРОТОКОЛ. ТЫ ТОЖЕ МОЖЕШЬ СТАТЬ ЛОТОМ.');
+      adjustAiTrust(state, -2);
+    } else {
+      this.addAi(`СУБЪЕКТ ${String(offer.slot).padStart(2, '0')} ДОБАВЛЕН В БУНКЕР. СЛЕДИ ЗА НИМ.`);
+    }
+    this.bus.emit('creature', { slot: offer.slot });
+    this.bus.emit('shop', { defId, slot: offer.slot });
+    this.save(true);
+    return { ok: true, creature };
+  }
+
+  shopState() {
+    const state = this.state;
+    if (!state) return [];
+    return CREATURE_SHOP.map((offer) => {
+      const owned = state.creatures.some((creature) => creature.defId === offer.id);
+      return {
+        ...offer,
+        owned,
+        unlocked: offer.start || state.day >= offer.unlockDay,
+        affordable: state.money >= offer.price,
+        def: getCreatureDef(offer.id),
+      };
+    });
+  }
+
   mutate(slot) {
     const state = this.state;
     if (!state || state.phase !== 'office') return { ok: false };
@@ -726,11 +928,15 @@ export class GameManager {
     const def = this.def(slot);
     const next = getMutation(def, creature.stage + 1);
     if (!next) return { ok: false, reason: 'Финальная стадия' };
+    if (mutationRemaining(creature) > 0) {
+      this.notify(`Шкала мутации не заполнена: осталось ${mutationRemaining(creature)} нажатий`, 'warning');
+      return { ok: false, reason: 'Шкала мутации не заполнена' };
+    }
     if (state.biomass < next.cost) {
       this.notify(`Нужно ${next.cost} биомассы`, 'danger');
       return { ok: false, reason: 'Мало биомассы' };
     }
-    if (!this.useEnergy(10)) return { ok: false, reason: 'Нет энергии' };
+    if (!this.useEnergy(BALANCE.mutation.energyCost)) return { ok: false, reason: 'Нет энергии' };
 
     state.biomass -= next.cost;
     state.shiftStats.biomassSpent += next.cost;
@@ -754,9 +960,9 @@ export class GameManager {
     if (creature.stats.integrity >= maxIntegrity(creature) - 1) {
       return { ok: false, reason: 'Клетка в порядке' };
     }
-    if (!this.spend(120)) return { ok: false, reason: 'Нет денег' };
-    if (!this.useEnergy(6)) {
-      this.refund(120);
+    if (!this.spend(420)) return { ok: false, reason: 'Нет денег' };
+    if (!this.useEnergy(8)) {
+      this.refund(420);
       return { ok: false, reason: 'Нет энергии' };
     }
     creature.stats.integrity = clamp(creature.stats.integrity + 18, 0, maxIntegrity(creature));
@@ -776,7 +982,7 @@ export class GameManager {
     if ((creature.restCooldown || 0) > 0) {
       return { ok: false, reason: `Существо отдыхает ещё ${Math.ceil(creature.restCooldown)} с` };
     }
-    if (!this.useEnergy(4)) return { ok: false, reason: 'Нет энергии' };
+    if (!this.useEnergy(5)) return { ok: false, reason: 'Нет энергии' };
     creature.restCooldown = 45;
     creature.stats.energy = clamp(creature.stats.energy + 14);
     creature.stats.stress = clamp(creature.stats.stress - 6);
@@ -794,6 +1000,10 @@ export class GameManager {
     if (!state || state.phase !== 'office') return { ok: false };
     const offer = state.offers.find((item) => item.id === offerId);
     if (!offer) return { ok: false, reason: 'Предложение устарело' };
+    if ((state.camDown[slot] || 0) > 0) {
+      this.notify('ПОМЕХИ НА КАМЕРЕ. СНАЧАЛА ВОССТАНОВИТЕ СВЯЗЬ.', 'danger');
+      return { ok: false, reason: 'Помехи на камере' };
+    }
     const creature = this.get(slot);
     const result = acceptContract(state, offer, creature, this.rng);
     if (!result.ok) {
@@ -998,51 +1208,65 @@ export class GameManager {
     const state = this.state;
     if (!state || !['office', 'escaping'].includes(state.phase)) return null;
 
+    const failed = FAILURE_REASONS.has(reason);
     if (reason === 'exhausted') {
-      this.changeRep(-2);
+      this.changeRep(-3);
     }
 
     state.phase = 'report';
     state.alarm = null;
     state.escape = null;
 
-    const salary = computeSalary(state);
-    state.money += salary;
-    state.shiftStats.salary = salary;
-    state.stats.moneyEarned += salary;
-    this.bus.emit('money', state.money);
+    if (!failed) {
+      const salary = computeSalary(state);
+      state.money += salary;
+      state.shiftStats.salary = salary;
+      state.stats.moneyEarned += salary;
+      this.bus.emit('money', state.money);
 
-    // Пассивная биомасса от содержания существ.
-    const production = state.creatures
-      .filter((creature) => creature.defId && ['idle', 'training'].includes(creature.status))
-      .reduce((sum, creature) => sum + biomassPerShift(creature), 0);
-    state.biomass = Math.max(0, state.biomass + production);
+      // Пассивная биомасса от содержания существ.
+      const production = state.creatures
+        .filter((creature) => creature.defId && ['idle', 'training'].includes(creature.status))
+        .reduce((sum, creature) => sum + biomassPerShift(creature), 0);
+      state.biomass = Math.max(0, state.biomass + production);
+      state.stats.shiftsDone += 1;
+      state.stats.daysDone = (state.stats.daysDone || 0) + 1;
+    } else {
+      state.shiftStats.salary = 0;
+    }
 
-    state.stats.shiftsDone += 1;
     state.report = buildReport(state, reason);
-    state.ending = evaluateEnding(state);
+    state.ending = failed ? { final: false, failed: true } : evaluateEnding(state);
 
     this.save(true);
+    this.bus.emit('day-end', { report: state.report, ending: state.ending });
     this.bus.emit('shift-end', { report: state.report, ending: state.ending });
     return state.report;
   }
 
-  nextShift() {
+  nextDay() {
     const state = this.state;
     if (!state || state.phase !== 'report') return false;
     advanceDay(state, this.rng);
     state.shiftStats = createShiftStats(state);
+    state.daySnapshot = this.captureDay(state);
     this.acc = 0;
     this.paused = false;
-    this.addLog(`ДЕНЬ ${state.day}. СМЕНА ${state.shift}.`, 'sys');
+    this.addLog(`ДЕНЬ ${state.day}. СЛОЖНОСТЬ ×${difficultyForDay(state.day).toFixed(2)}.`, 'sys');
     this.addAi(
       state.day > 6
         ? 'ТЫ ВСЁ ЕЩЁ ЗДЕСЬ. ЭТО ХОРОШО. НАВЕРНОЕ.'
-        : 'НОВАЯ СМЕНА. ПОКАЗАТЕЛИ ДОЛЖНЫ БЫТЬ В НОРМЕ.'
+        : 'НОВЫЙ ДЕНЬ. ПОКАЗАТЕЛИ ДОЛЖНЫ БЫТЬ В НОРМЕ.'
     );
     this.save(true);
+    this.bus.emit('day-start', state);
     this.bus.emit('shift-start', state);
     return true;
+  }
+
+  /** Совместимость со старыми вызовами. */
+  nextShift() {
+    return this.nextDay();
   }
 
   takePendingNote() {

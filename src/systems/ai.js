@@ -19,10 +19,10 @@ export function rollAiLine(state, rng) {
     (creature) =>
       ['idle', 'training'].includes(creature.status) &&
       creature.stats &&
-      (creature.stats.stress > 72 || creature.stats.aggression > 65)
+      (creature.stats.stress > 62 || creature.stats.aggression > 55)
   );
 
-  if (lyingCandidate && rng.chance(0.24)) {
+  if (lyingCandidate && rng.chance(0.4)) {
     return {
       text: `ВНИМАНИЕ: СЕКТОР ${String(lyingCandidate.slot).padStart(2, '0')} ТРЕБУЕТ ПРОВЕРКИ.`,
       lie: false,
@@ -31,16 +31,20 @@ export function rollAiLine(state, rng) {
     };
   }
 
-  // Чем ниже доверие к НАДЗОРУ, тем чаще он скрывает правду.
+  // Чем ниже доверие к НАДЗОРУ и чем позже день, тем чаще он скрывает правду.
   const trust = state.plot?.aiTrust ?? 50;
-  const lieChance = Math.max(0.15, Math.min(0.72, 0.2 + (100 - trust) / 220));
+  const lieChance = Math.max(
+    0.35,
+    Math.min(0.92, 0.38 + (state.day - 1) * 0.025 + (100 - trust) / 220)
+  );
 
   if (lyingCandidate && rng.chance(lieChance)) {
     return {
       text: rng.pick(AI_LINES.lie),
       lie: true,
-      camDown: { slot: lyingCandidate.slot, seconds: rng.int(9, 15) },
+      camDown: { slot: lyingCandidate.slot, seconds: rng.int(14, 24) },
       slot: lyingCandidate.slot,
+      stress: rng.int(2, 5),
     };
   }
 
