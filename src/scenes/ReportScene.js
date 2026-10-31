@@ -128,12 +128,14 @@ export class ReportScene extends Phaser.Scene {
     });
 
     makeText(this, 116, 354, 'РЕПУТАЦИЯ ОФИСА', { size: 11, color: COLORS.text, font: 'body' });
-    const repDelta = Math.round(report.repAfter - report.repBefore);
+    const repBefore = Math.round(report.repBefore);
+    const repAfter = Math.round(report.repAfter);
+    const repDelta = repAfter - repBefore;
     makeText(
       this,
       620,
       350,
-      `${report.repBefore} → ${report.repAfter} (${repDelta >= 0 ? '+' : ''}${repDelta})`,
+      `${repBefore} → ${repAfter} (${repDelta >= 0 ? '+' : ''}${repDelta})`,
       {
         size: 11,
         color: repDelta >= 0 ? COLORS.green : COLORS.red,
@@ -338,7 +340,7 @@ export class ReportScene extends Phaser.Scene {
         icon: 'back',
         onClick: () => {
           const ok = manager.restartDay();
-          if (ok) this.scene.start('Office');
+          if (ok) this.time.delayedCall(20, () => this.scene.start('Office'));
         },
       });
     } else {
@@ -348,7 +350,7 @@ export class ReportScene extends Phaser.Scene {
         icon: 'contract',
         onClick: () => {
           const ok = manager.nextDay();
-          if (ok) this.scene.start('Office');
+          if (ok) this.time.delayedCall(20, () => this.scene.start('Office'));
         },
       });
     }

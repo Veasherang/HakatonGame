@@ -11,6 +11,7 @@ import { COMPANY_LIST } from '../src/data/companies.js';
 import { UPGRADES } from '../src/data/upgrades.js';
 import { NOTES, ENDINGS } from '../src/data/plot.js';
 import { readiness } from '../src/systems/creatures.js';
+import { nextMaintenanceDelay } from '../src/systems/maintenance.js';
 
 class MemoryStorage {
   constructor() {
@@ -393,6 +394,60 @@ test('Перезапуск дня возвращает стартовые пар
   assert.equal(manager.get(1).stats.hunger, before.hunger);
   assert.equal(manager.state.offers.length, before.offers);
   assert.equal(manager.state.phase, 'office');
+});
+
+test('Обслуживание бункера: награда и штраф', () => {
+  const manager = fresh(808);
+  manager.state.money = 1600;
+  const rep = manager.state.reputation;
+  const success = manager.resolveMaintenance(true, 'wires');
+  assert.equal(success.success, true);
+  assert.equal(manager.state.money, 1600 + BALANCE.maintenance.rewardMoney);
+  assert.equal(manager.state.reputation, rep + BALANCE.maintenance.rewardRep);
+  const fail = manager.resolveMaintenance(false, 'samples');
+  assert.equal(fail.success, false);
+  assert.equal(manager.state.money, 1600 + BALANCE.maintenance.rewardMoney - BALANCE.maintenance.penaltyMoney);
+  assert.equal(manager.state.reputation, rep);
+  assert.equal(BALANCE.economy.generatorCost, 1000);
+});
+
+test('Частота обслуживания: одиночный контракт, половина и большинство', () => {
+  const manager = fresh(909);
+  const state = manager.state;
+  const sample = () => {
+    const values = [];
+    for (let index = 0; index < 200; index += 1) values.push(nextMaintenanceDelay(state));
+    return [Math.min(...values), Math.max(...values)];
+  };
+  manager.get(1).status = 'contract';
+  const single = sample();
+  assert.ok(single[0] >= 10 && single[1] <= 20, `один: ${single}`);
+
+  manager.state.day = 4;
+  manager.state.money = 50000;
+  manager.buyCreature('pamydsa');
+  manager.get(2).status = 'idle';
+  const half = sample();
+  assert.deepEqual(half, [60, 60]);
+
+  manager.get(2).status = 'contract';
+  const above = sample();
+  assert.ok(above[0] >= 15 && above[1] <= 30, `большинство: ${above}`);
+});
+
+test('Мытьё повышает чистоту и тратит деньги/энергию', () => {
+  const manager = fresh(1010);
+  const creature = manager.get(1);
+  creature.stats.cleanliness = 40;
+  const money = manager.state.money;
+  const energy = manager.state.operatorEnergy;
+  const stress = creature.stats.stress;
+  const result = manager.cleanCreature(1);
+  assert.equal(result.ok, true);
+  assert.equal(manager.state.money, money - BALANCE.cleaning.cost);
+  assert.equal(manager.state.operatorEnergy, energy - BALANCE.cleaning.energy);
+  assert.equal(creature.stats.cleanliness, 40 + BALANCE.cleaning.amount);
+  assert.equal(creature.stats.stress, stress + BALANCE.cleaning.stress);
 });
 
 test('Симуляция 10 дней: экономика не уходит в минус и не ломается', () => {

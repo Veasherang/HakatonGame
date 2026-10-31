@@ -68,6 +68,8 @@ export class OfficeScene extends Phaser.Scene {
           body: `${note.text}\n\n— найденная записка, день ${note.day}`,
           bodySize: 15,
           lineSpacing: 5,
+          width: 820,
+          height: 620,
           accent: COLORS.purple,
           pause: true,
           typewriter: true,
@@ -394,7 +396,7 @@ export class OfficeScene extends Phaser.Scene {
     });
     panel.add(this.powerBar);
 
-    this.generatorBtn = new Button(this, 20, 218, 152, 32, 'ГЕНЕРАТОР 1600₽', {
+    this.generatorBtn = new Button(this, 20, 218, 152, 32, 'ГЕНЕРАТОР 1000₽', {
       variant: 'ghost',
       size: 7,
       icon: 'power',
@@ -755,7 +757,7 @@ export class OfficeScene extends Phaser.Scene {
     }
 
     this.coffeeBtn.setEnabled(state.coffeeUsed < 3 && state.money >= 200);
-    this.generatorBtn.setEnabled(state.money >= 1600);
+    this.generatorBtn.setEnabled(state.money >= 1000);
   }
 
   refreshAi() {
@@ -787,7 +789,6 @@ export class OfficeScene extends Phaser.Scene {
 
   update(time, delta) {
     if (!manager.state) return;
-    manager.tick(delta);
     this.operator?.update(time);
     for (const window of this.windows) window.tickUpdate(time);
 
@@ -823,6 +824,20 @@ export class OfficeScene extends Phaser.Scene {
       this.logFlash -= delta / 380;
       this.logList.setAlpha(1 + Math.max(0, this.logFlash) * 0.25);
     }
+  }
+
+  /* ========================================================================
+     Обслуживание бункера
+     ====================================================================== */
+
+  /** Ручной запуск для отладки/тестов; в игре заявки планирует MaintenanceController. */
+  openMaintenance(variant = null) {
+    const state = manager.state;
+    if (!state || this.scene.isActive('Maintenance')) return false;
+    this.scene.launch('Maintenance', { variant, sourceKey: 'Office' });
+    this.input.enabled = false;
+    if (this.input.keyboard) this.input.keyboard.enabled = false;
+    return true;
   }
 
   /* ========================================================================

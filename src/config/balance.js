@@ -22,7 +22,7 @@ export const BALANCE = {
     baseSalary: 600,
     salaryPerReputation: 4,
     replacementCost: 2600,
-    generatorCost: 1600,
+    generatorCost: 1000,
     generatorPower: 45,
     emergencyCost: 0,
     maxReputation: 100,
@@ -70,6 +70,7 @@ export const BALANCE = {
     fastMin: 1.35,
     fastMax: 1.95,
     slowModifier: 0.3,
+    statSpeedMultiplier: 1.4,
   },
 
   difficulty: {
@@ -84,11 +85,38 @@ export const BALANCE = {
     baseSeconds: 16,
   },
 
+  maintenance: {
+    normalMin: 90,
+    normalMax: 120,
+    halfInterval: 60,
+    fastMin: 15,
+    fastMax: 30,
+    singleMin: 10,
+    singleMax: 20,
+    normalFactor: 0.78,
+    timeout: 28,
+    rewardMoney: 150,
+    rewardRep: 2,
+    penaltyMoney: 80,
+    penaltyRep: 2,
+    wireMin: 4,
+    wireMax: 7,
+    sampleMin: 3,
+    sampleMax: 6,
+  },
+
   training: {
     energyCost: 10,
     baseTime: 26,
     levelXp: 24,
     priceScale: 2.7,
+  },
+
+  cleaning: {
+    cost: 80,
+    energy: 6,
+    amount: 30,
+    stress: 2,
   },
 
   mutation: {

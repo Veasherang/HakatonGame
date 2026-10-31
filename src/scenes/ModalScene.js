@@ -67,18 +67,40 @@ export class ModalScene extends Phaser.Scene {
     closeBtn.setDepth(5);
 
     const bodyWidth = width - 80;
-    this.bodyText = makeText(this, x + 40, y + 72, '', {
+    const bodyTop = y + 72;
+    const bodyBottom = y + height - 74 - 14;
+    const maxBodyHeight = Math.max(80, bodyBottom - bodyTop);
+    this.bodyText = makeText(this, x + 40, bodyTop, '', {
       size: data.bodySize || 17,
       color: COLORS.text,
       font: 'body',
       wrap: bodyWidth,
       lineSpacing: data.lineSpacing ?? 6,
     });
+    this.bodyTop = bodyTop;
+    this.maxBodyHeight = maxBodyHeight;
 
     const fullBody = data.body || '';
     this.fullBody = fullBody;
     this.revealed = 0;
     this.typewriterDone = false;
+
+    // Длинные записки автоматически уменьшаются, чтобы не залезать под кнопки.
+    let fittedSize = data.bodySize || 17;
+    this.bodyText.setText(fullBody);
+    while (this.bodyText.height > maxBodyHeight && fittedSize > 10) {
+      fittedSize -= 1;
+      this.bodyText.setFontSize(fittedSize);
+      this.bodyText.setText(fullBody);
+    }
+    this.bodyText.setFontSize(fittedSize);
+    this.bodyText.setText('');
+
+    const bodyMaskShape = this.make.graphics({ x: 0, y: 0, add: false });
+    bodyMaskShape.fillStyle(0xffffff, 1);
+    bodyMaskShape.fillRect(x + 30, bodyTop, width - 60, maxBodyHeight);
+    this.bodyMask = bodyMaskShape.createGeometryMask();
+    this.bodyText.setMask(this.bodyMask);
 
     if (data.typewriter === false) {
       this.bodyText.setText(fullBody);

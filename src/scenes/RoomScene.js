@@ -8,7 +8,7 @@ import { FOODS } from '../data/food.js';
 import { UPGRADES, UPGRADE_MAX_LEVEL, maxIntegrity, upgradeCost } from '../data/upgrades.js';
 import { CARE_TOOL_LIST } from '../data/tools.js';
 import { professionLabel } from '../data/companies.js';
-import { STAT_META } from '../config/balance.js';
+import { BALANCE, STAT_META } from '../config/balance.js';
 import { addCoverImage } from '../ui/backdrop.js';
 import { COLORS, addScanlines, drawBar, drawIcon, drawPanel, makeText, statColor } from '../ui/theme.js';
 import { Button, StatBar, showToast } from '../ui/widgets.js';
@@ -274,17 +274,6 @@ export class RoomScene extends Phaser.Scene {
     });
     this.helpBtn.setDepth(41);
     this.backBtn.setDepth(40);
-    this.helpBtn.setDepth(41);
-
-    this.otherAlarmBtn = new Button(this, 696, 16, 156, 34, 'ПЕРЕЙТИ', {
-      variant: 'danger',
-      size: 7,
-      onClick: () => {
-        if (manager.state?.alarm) this.scene.restart({ slot: manager.state.alarm.slot });
-      },
-    });
-    this.otherAlarmBtn.setDepth(41);
-    this.otherAlarmBtn.setVisible(false);
   }
 
   buildPanel() {
@@ -447,6 +436,7 @@ export class RoomScene extends Phaser.Scene {
     this.actionBar = this.add.container(0, 0).setDepth(40);
     const labels = [
       ['feed', 'КОРМИТЬ'],
+      ['clean', 'ПОМЫТЬ'],
       ['train', 'ОБУЧАТЬ'],
       ['calm', 'УСПОКОИТЬ'],
       ['rest', 'ОТДЫХ'],
@@ -457,7 +447,7 @@ export class RoomScene extends Phaser.Scene {
     ];
     this.actionButtons = {};
     labels.forEach(([key, label], index) => {
-      const button = new Button(this, 24 + index * 108, 716, 102, 48, label, {
+      const button = new Button(this, 24 + index * 96, 716, 90, 48, label, {
         variant: key === 'feed' ? 'primary' : key === 'contract' ? 'amber' : 'default',
         size: 8,
         onClick: () => this.onAction(key),
@@ -518,9 +508,9 @@ export class RoomScene extends Phaser.Scene {
     this.interference = { container, noise, timer, clear, game: null };
   }
 
-  openInterferenceGame() {
+  openInterferenceGame(forcedVariant = null) {
     if (this.interference?.game) return;
-    const variant = Math.random() < 0.5 ? 'clicker' : 'digits';
+    const variant = forcedVariant || (Math.random() < 0.5 ? 'clicker' : 'digits');
     const game = this.add.container(0, 0).setDepth(70);
     const panel = this.add.graphics();
     drawPanel(panel, 250, 180, 780, 440, {
@@ -548,7 +538,7 @@ export class RoomScene extends Phaser.Scene {
   }
 
   buildJamClicker(game) {
-    const target = 10 + Math.floor(Math.random() * 7) + this.slot;
+    const target = 5 + Math.floor(Math.random() * 11);
     let clicks = 0;
     const hint = makeText(this, 640, 250, 'ПОМЕХИ ДРОЖАТ. НАЖИМАЙ, ЧТОБЫ СТАБИЛИЗИРОВАТЬ КАНАЛ.', {
       size: 14,
@@ -583,15 +573,22 @@ export class RoomScene extends Phaser.Scene {
   }
 
   buildJamDigits(game) {
-    const numbers = [1, 2, 3, 4, 5, 6];
+    const count = 6 + Math.floor(Math.random() * 4);
+    const numbers = Array.from({ length: count }, (_, index) => index + 1);
     const shuffled = Phaser.Utils.Array.Shuffle([...numbers]);
     let expected = 1;
-    const hint = makeText(this, 640, 246, 'ВОССТАНОВИ КОД: НАЖИМАЙ ЦИФРЫ ПО ВОЗРАСТАНИЮ.', {
-      size: 14,
-      color: COLORS.text,
-      font: 'body',
-      origin: [0.5, 0],
-    });
+    const hint = makeText(
+      this,
+      640,
+      246,
+      `ВОССТАНОВИ КОД: НАЖИМАЙ ${count} ЦИФР ПО ВОЗРАСТАНИЮ.`,
+      {
+        size: 14,
+        color: COLORS.text,
+        font: 'body',
+        origin: [0.5, 0],
+      }
+    );
     const status = makeText(this, 640, 280, 'СЛЕДУЮЩАЯ: 1', {
       size: 10,
       color: COLORS.amber,
@@ -616,8 +613,8 @@ export class RoomScene extends Phaser.Scene {
           }
           expected += 1;
           button.setEnabled(false);
-          status.setText(expected > 6 ? 'КОД ПРИНЯТ' : `СЛЕДУЮЩАЯ: ${expected}`);
-          if (expected > 6) this.completeInterferenceGame();
+          status.setText(expected > count ? 'КОД ПРИНЯТ' : `СЛЕДУЮЩАЯ: ${expected}`);
+          if (expected > count) this.completeInterferenceGame();
         },
       });
       buttons.push(button);
@@ -704,10 +701,16 @@ export class RoomScene extends Phaser.Scene {
     });
     on('notice', (notice) => showToast(this, notice.text, { kind: notice.kind, y: 676 }));
     on('alarm', (alarm) => {
+      manager.audio?.startAlarm?.();
       if (alarm?.slot === this.slot) this.enterDefense();
       else this.showOtherAlarm();
     });
-    on('alarm-cleared', () => this.exitDefense());
+    on('alarm-cleared', () => {
+      this.exitDefense();
+      if (!this.state.alarm) {
+        manager.audio?.stopAlarm?.();
+      }
+    });
     on('escape', (escape) => {
       manager.audio?.stopAlarm?.();
       this.scene.start('Horror', escape);
@@ -807,12 +810,8 @@ export class RoomScene extends Phaser.Scene {
     }
 
     if (this.state.alarm && this.state.alarm.slot !== this.slot) {
-      this.otherAlarmBtn.setVisible(true);
-      this.otherAlarmBtn.setLabel(`СЕКТОР ${this.state.alarm.slot} · ПЕРЕЙТИ`);
       this.topStatus.setText(`ТРЕВОГА В СЕКТОРЕ ${this.state.alarm.slot}`);
       this.topStatus.setColor(COLORS.red);
-    } else {
-      this.otherAlarmBtn.setVisible(false);
     }
   }
 
@@ -1029,6 +1028,10 @@ export class RoomScene extends Phaser.Scene {
     }
 
     this.actionButtons.feed.setEnabled(active && money >= 70 && energy >= 4);
+    this.actionButtons.clean.setEnabled(
+      active && c.stats.cleanliness < 98 && money >= BALANCE.cleaning.cost && energy >= BALANCE.cleaning.energy
+    );
+    this.actionButtons.clean.setSub(`${BALANCE.cleaning.cost} ₽`);
     this.actionButtons.train.setEnabled(active);
     this.actionButtons.calm.setEnabled(active && energy >= 4);
     this.actionButtons.rest.setEnabled(active && (c.restCooldown || 0) <= 0 && energy >= 5);
@@ -1113,7 +1116,6 @@ export class RoomScene extends Phaser.Scene {
 
   update(time, delta) {
     if (!manager.state) return;
-    manager.tick(delta);
 
     if (this.creature && this.creature.status === 'idle' && this.creature.stats) {
       const unstable = this.creature.stats.stress > 70 || this.creature.stats.aggression > 65;
@@ -1149,6 +1151,9 @@ export class RoomScene extends Phaser.Scene {
       case 'feed':
         this.openFeedPanel();
         break;
+      case 'clean':
+        this.cleanAction();
+        break;
       case 'train':
         this.openTrainPanel();
         break;
@@ -1172,6 +1177,23 @@ export class RoomScene extends Phaser.Scene {
         break;
       default:
         break;
+    }
+  }
+
+  cleanAction() {
+    const result = manager.cleanCreature(this.slot);
+    if (result.ok) {
+      showToast(
+        this,
+        `ПОМЫТО. ЧИСТОТА +${BALANCE.cleaning.amount}, СТРЕСС +${BALANCE.cleaning.stress}.`,
+        { kind: 'good', y: 676 }
+      );
+      manager.audio?.confirm?.();
+      this.cameras.main.flash(140, 30, 90, 110);
+      this.refreshAll();
+    } else {
+      showToast(this, result.reason || 'Недоступно', { kind: 'danger', y: 676 });
+      manager.audio?.error?.();
     }
   }
 
@@ -2060,16 +2082,12 @@ export class RoomScene extends Phaser.Scene {
   }
 
   showOtherAlarm() {
-    if (!this.state.alarm) {
-      this.otherAlarmBtn.setVisible(false);
-      return;
-    }
-    this.otherAlarmBtn.setVisible(true);
-    this.otherAlarmBtn.setLabel(`СЕКТОР ${this.state.alarm.slot} · ПЕРЕЙТИ`);
-    showToast(this, `ТРЕВОГА В СЕКТОРЕ ${this.state.alarm.slot}. ВЕРНИТЕСЬ К КАМЕРАМ.`, {
-      kind: 'danger',
-      y: 676,
-    });
+    if (!this.state.alarm) return;
+    showToast(
+      this,
+      `ТРЕВОГА В СЕКТОРЕ ${String(this.state.alarm.slot).padStart(2, '0')}. НУЖНО СДЕРЖИВАНИЕ.`,
+      { kind: 'danger', y: 676, duration: 3200 }
+    );
   }
 
   /* ========================================================================

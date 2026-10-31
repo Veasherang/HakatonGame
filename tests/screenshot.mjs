@@ -139,6 +139,52 @@ async function main() {
       await sleep(Number(process.env.ATD_WAIT_AFTER_EXPR || 700));
     }
 
+    if (process.env.ATD_DRAG_PLAN) {
+      const planResult = await client.send('Runtime.evaluate', {
+        expression: 'window.__dragPlan',
+        returnByValue: true,
+      });
+      const plan = planResult.result?.value;
+      if (plan?.from && plan?.to) {
+        const { from, to } = plan;
+        await client.send('Input.dispatchMouseEvent', {
+          type: 'mouseMoved',
+          x: from.x,
+          y: from.y,
+          button: 'none',
+        });
+        await sleep(80);
+        await client.send('Input.dispatchMouseEvent', {
+          type: 'mousePressed',
+          x: from.x,
+          y: from.y,
+          button: 'left',
+          buttons: 1,
+          clickCount: 1,
+        });
+        for (let step = 1; step <= 8; step += 1) {
+          await sleep(35);
+          await client.send('Input.dispatchMouseEvent', {
+            type: 'mouseMoved',
+            x: from.x + ((to.x - from.x) * step) / 8,
+            y: from.y + ((to.y - from.y) * step) / 8,
+            button: 'left',
+            buttons: 1,
+          });
+        }
+        await sleep(80);
+        await client.send('Input.dispatchMouseEvent', {
+          type: 'mouseReleased',
+          x: to.x,
+          y: to.y,
+          button: 'left',
+          buttons: 0,
+          clickCount: 1,
+        });
+        await sleep(700);
+      }
+    }
+
     let expression2 = process.argv[6];
     if (expression2?.startsWith('@')) {
       expression2 = fs.readFileSync(expression2.slice(1), 'utf8');
@@ -150,7 +196,7 @@ async function main() {
       await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: clickX, y: clickY, button: 'left', clickCount: 1 });
       await sleep(90);
       await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: clickX, y: clickY, button: 'left', clickCount: 1 });
-      await sleep(700);
+      await sleep(Number(process.env.ATD_WAIT_AFTER_CLICK || 700));
     }
     if (expression2) {
       const evaluated = await client.send('Runtime.evaluate', {

@@ -17,7 +17,7 @@ export function rollEvent(state, rng) {
 
   const add = (weight, factory) => candidates.push({ weight, factory });
 
-  add(3, () => ({
+  add(1, () => ({
     id: 'power_surge',
     title: 'СКАЧОК НАПРЯЖЕНИЯ',
     kind: 'warning',

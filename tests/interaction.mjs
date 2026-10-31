@@ -160,6 +160,15 @@ try {
     m.state.alarmCooldown = 99999;
     m.state.alarm = null;
     m.state.camDown = {};
+    const maintenance = window.__ATD__.game.maintenanceController;
+    if (maintenance) {
+      maintenance.timer = 999999;
+      maintenance.lastDay = m.state.day;
+      maintenance.lastAway = m.state.creatures.filter(
+        (creature) => creature.defId && creature.status === 'contract'
+      ).length;
+      maintenance.active = true;
+    }
     m.paused = false;
   })()`);
 
@@ -247,7 +256,7 @@ try {
   );
   check('Панель закрылась после действия', parsedAfter.modal === false);
 
-  await click(183, 740);
+  await click(261, 740);
   await sleep(500);
   await evaluate(`delete window.__ATD__.manager.state.camDown[1]; window.__ATD__.game.scene.getScene('Room').refreshAll()`);
   const trainOpen = await evaluate(`Boolean(window.__ATD__.game.scene.getScene('Room').modal)`);
@@ -373,7 +382,7 @@ try {
     await client.send('Runtime.evaluate', { expression: 'window.focus()' });
     await sleep(1000);
     menuActive = await evaluate(
-      `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+      `window.__ATD__ ? window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',') : 'Boot'`
     );
     if (menuActive.includes('Menu')) break;
   }

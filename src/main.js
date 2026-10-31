@@ -15,6 +15,8 @@ import { HorrorScene } from './scenes/HorrorScene.js';
 import { EndingScene } from './scenes/EndingScene.js';
 import { ModalScene } from './scenes/ModalScene.js';
 import { GuideScene } from './scenes/GuideScene.js';
+import { MaintenanceScene } from './scenes/MaintenanceScene.js';
+import { MaintenanceController } from './systems/maintenance.js';
 
 async function loadFonts() {
   if (!document.fonts) return;
@@ -81,6 +83,7 @@ function boot() {
       EndingScene,
       ModalScene,
       GuideScene,
+      MaintenanceScene,
     ],
   };
 
@@ -89,7 +92,51 @@ function boot() {
   phaserGame.manager = manager;
   manager.audio = audio;
 
-  window.__ATD__ = { game: phaserGame, manager, audio };
+  const maintenance = new MaintenanceController(phaserGame);
+  phaserGame.maintenanceController = maintenance;
+
+  // Единый игровой тик для всех экранов, где должен идти день.
+  const gameplayKeys = new Set(['Office', 'Room', 'Market', 'Shop', 'Maintenance']);
+  phaserGame.events.on('poststep', (time, delta) => {
+    if (!manager.state) return;
+    const activeKeys = phaserGame.scene.getScenes(true).map((scene) => scene.scene.key);
+    if (!activeKeys.some((key) => gameplayKeys.has(key))) return;
+    manager.tick(delta);
+    maintenance.update(delta, phaserGame, activeKeys);
+  });
+
+  const activeKeysNow = () =>
+    phaserGame.scene.getScenes(true).map((scene) => scene.scene.key);
+
+  // Тревога должна быть слышна на любом экране, а не только в активной камере.
+  manager.bus.on('alarm', () => {
+    audio.init();
+    audio.resume();
+    audio.startAlarm();
+  });
+  manager.bus.on('alarm-cleared', () => audio.stopAlarm());
+  manager.bus.on('escape', () => audio.stopAlarm());
+  manager.bus.on('shift-end', () => audio.stopAlarm());
+
+  // Магазин и рынок не имеют собственных обработчиков завершения смены/побега,
+  // но теперь время в них идёт.
+  manager.bus.on('shift-end', () => {
+    const keys = activeKeysNow();
+    if (keys.includes('Office') || keys.includes('Room')) return;
+    const key = keys.includes('Shop') ? 'Shop' : keys.includes('Market') ? 'Market' : null;
+    if (!key) return;
+    phaserGame.scene.getScene(key)?.scene.start('Report');
+  });
+
+  manager.bus.on('escape', (escape) => {
+    const keys = activeKeysNow();
+    if (keys.includes('Office') || keys.includes('Room') || keys.includes('Horror')) return;
+    const key = keys.includes('Shop') ? 'Shop' : keys.includes('Market') ? 'Market' : null;
+    if (!key) return;
+    phaserGame.scene.getScene(key)?.scene.start('Horror', escape);
+  });
+
+  window.__ATD__ = { game: phaserGame, manager, audio, maintenance };
 
   const unlockAudio = () => {
     audio.init();

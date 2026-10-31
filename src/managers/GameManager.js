@@ -838,6 +838,41 @@ export class GameManager {
     };
   }
 
+  /** Итог аварийной заявки обслуживания бункера. */
+  resolveMaintenance(success, variant = 'wires') {
+    const state = this.state;
+    if (!state || state.phase !== 'office') return null;
+    const cfg = BALANCE.maintenance;
+    const label = variant === 'samples' ? 'СОРТИРОВКА ОБРАЗЦОВ' : 'ЭЛЕКТРОСЕТЬ';
+    let moneyDelta = 0;
+    let repDelta = 0;
+
+    if (success) {
+      moneyDelta = cfg.rewardMoney;
+      repDelta = cfg.rewardRep;
+      state.money += moneyDelta;
+      state.stats.moneyEarned += moneyDelta;
+      state.shiftStats.moneyEarned += moneyDelta;
+      this.addLog(`ОБСЛУЖИВАНИЕ: ${label} — ИСПРАВНО. ПРЕМИЯ ${moneyDelta} ₽.`, 'good');
+      this.addAi('СИСТЕМА ВОССТАНОВЛЕНА. ПРОДОЛЖАЙ РАБОТУ.');
+    } else {
+      moneyDelta = -Math.min(state.money, cfg.penaltyMoney);
+      repDelta = -cfg.penaltyRep;
+      state.money += moneyDelta;
+      state.stats.moneySpent += Math.abs(moneyDelta);
+      state.shiftStats.moneySpent += Math.abs(moneyDelta);
+      this.addLog(`ОБСЛУЖИВАНИЕ: ${label} — ПРОВАЛ. ШТРАФ ${Math.abs(moneyDelta)} ₽.`, 'danger');
+      this.addAi('ТЫ НЕ СПРАВИЛСЯ С СИСТЕМОЙ. ЭТО ЗАФИКСИРОВАНО.');
+    }
+
+    if (repDelta) this.changeRep(repDelta);
+    this.bus.emit('money', state.money);
+    const result = { success, variant, moneyDelta, repDelta, label };
+    this.bus.emit('maintenance', result);
+    this.save(true);
+    return result;
+  }
+
   /** Убрать помехи на камере после успешной мини-игры. */
   clearInterference(slot) {
     const state = this.state;
@@ -940,6 +975,33 @@ export class GameManager {
     return { ok: true, mutation: result.mutation };
   }
 
+  /** Помыть существо и клетку: заметно повышает чистоту. */
+  cleanCreature(slot) {
+    const state = this.state;
+    if (!state || state.phase !== 'office') return { ok: false };
+    const usable = this.usable(slot);
+    if (!usable.ok) return usable;
+    const creature = usable.creature;
+    if (creature.stats.cleanliness >= 98) {
+      return { ok: false, reason: 'Существо уже чистое' };
+    }
+    if (!this.spend(BALANCE.cleaning.cost)) return { ok: false, reason: 'Нет денег' };
+    if (!this.useEnergy(BALANCE.cleaning.energy)) {
+      this.refund(BALANCE.cleaning.cost);
+      return { ok: false, reason: 'Нет энергии' };
+    }
+    creature.stats.cleanliness = clamp(creature.stats.cleanliness + BALANCE.cleaning.amount);
+    creature.stats.stress = clamp(creature.stats.stress + BALANCE.cleaning.stress);
+    creature.activity = 'ЧИСТИТСЯ';
+    this.addLog(
+      `${creature.name}: ПОМЫТ. ЧИСТОТА +${BALANCE.cleaning.amount}, СТРЕСС +${BALANCE.cleaning.stress}`,
+      'good'
+    );
+    this.bus.emit('creature', { slot });
+    this.save();
+    return { ok: true };
+  }
+
   repairCell(slot) {
     const state = this.state;
     if (!state || state.phase !== 'office') return { ok: false };
@@ -949,9 +1011,9 @@ export class GameManager {
     if (creature.stats.integrity >= maxIntegrity(creature) - 1) {
       return { ok: false, reason: 'Клетка в порядке' };
     }
-    if (!this.spend(420)) return { ok: false, reason: 'Нет денег' };
+    if (!this.spend(460)) return { ok: false, reason: 'Нет денег' };
     if (!this.useEnergy(8)) {
-      this.refund(420);
+      this.refund(460);
       return { ok: false, reason: 'Нет энергии' };
     }
     creature.stats.integrity = clamp(creature.stats.integrity + 18, 0, maxIntegrity(creature));
