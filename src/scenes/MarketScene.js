@@ -102,6 +102,12 @@ export class MarketScene extends Phaser.Scene {
       color: COLORS.cyan,
       font: 'display',
     });
+    const limit = manager.contractLimit();
+    makeText(this, 380, 94, `НА КОНТРАКТАХ ${limit.active}/${limit.max}`, {
+      size: 8,
+      color: limit.available > 0 ? COLORS.green : COLORS.red,
+      font: 'display',
+    });
 
     if (!this.state.offers.length) {
       makeText(
@@ -162,12 +168,13 @@ export class MarketScene extends Phaser.Scene {
           manager.readinessOf(creature.slot) >= offer.reqReadiness &&
           manager.def(creature.slot)?.professions.includes(offer.profession)
       ).length;
+      const effectiveReady = manager.contractLimit().available > 0 ? ready : 0;
       makeText(
         this,
         x + 18,
         y + 74,
-        `ГОТОВНОСТЬ ${offer.reqReadiness}/100 · ПОДХОДЯЩИХ: ${ready}`,
-        { size: 8, color: ready ? COLORS.green : COLORS.red, font: 'display' }
+        `ГОТОВНОСТЬ ${offer.reqReadiness}/100 · ПОДХОДЯЩИХ: ${effectiveReady}`,
+        { size: 8, color: effectiveReady ? COLORS.green : COLORS.red, font: 'display' }
       );
       makeText(this, x + 18, y + 94, offer.flavor, {
         size: 10,
@@ -183,10 +190,10 @@ export class MarketScene extends Phaser.Scene {
         origin: [1, 0],
       });
 
-      const button = new Button(this, x + w - 240, y + h - 38, 210, 28, ready ? 'ВЫБРАТЬ ИСПОЛНИТЕЛЯ' : 'НЕТ ГОТОВЫХ', {
-        variant: ready ? 'amber' : 'ghost',
+      const button = new Button(this, x + w - 240, y + h - 38, 210, 28, effectiveReady ? 'ВЫБРАТЬ ИСПОЛНИТЕЛЯ' : 'НЕТ МЕСТА', {
+        variant: effectiveReady ? 'amber' : 'ghost',
         size: 7,
-        enabled: ready > 0,
+        enabled: effectiveReady > 0,
         onClick: () => this.openPicker(offer),
       });
     });
@@ -357,8 +364,12 @@ export class MarketScene extends Phaser.Scene {
         const readiness = manager.readinessOf(creature.slot);
         const def = manager.def(creature.slot);
         const professionMatch = def?.professions.includes(offer.profession);
+        const hasContractSlot = manager.contractLimit().available > 0;
         const eligible =
-          readiness >= offer.reqReadiness && creature.status === 'idle' && professionMatch;
+          readiness >= offer.reqReadiness &&
+          creature.status === 'idle' &&
+          professionMatch &&
+          hasContractSlot;
 
         const rowG = this.add.graphics();
         drawPanel(rowG, px + 22, y, width - 44, 74, {
@@ -440,6 +451,6 @@ export class MarketScene extends Phaser.Scene {
 
   goBack() {
     manager.audio?.ui?.();
-    this.scene.start('Office');
+    this.time.delayedCall(20, () => this.scene.start('Office'));
   }
 }

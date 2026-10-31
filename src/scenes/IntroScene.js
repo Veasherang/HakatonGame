@@ -34,7 +34,7 @@ export class IntroScene extends Phaser.Scene {
     g.lineStyle(1, COLORS.amber, 0.55);
     g.lineBetween(x + 20, y + 54, x + w - 20, y + 54);
 
-    makeText(this, x + 24, y + 16, 'ТРУДОВОЙ ДОГОВОР № 67-А', {
+    makeText(this, x + 24, y + 16, 'ТРУДОВОЙ ДОГОВОР № 05-АТД', {
       size: 12,
       color: COLORS.amber,
       font: 'display',
@@ -47,11 +47,11 @@ export class IntroScene extends Phaser.Scene {
     });
 
     this.body = makeText(this, x + 36, y + 78, '', {
-      size: 16,
+      size: 14,
       color: COLORS.text,
       font: 'body',
       wrap: w - 72,
-      lineSpacing: 7,
+      lineSpacing: 5,
     });
 
     this.fullText = INTRO_TEXT;

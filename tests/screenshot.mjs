@@ -136,7 +136,7 @@ async function main() {
         awaitPromise: false,
       });
       console.log('EVAL', JSON.stringify(evaluated.result?.value ?? evaluated.result));
-      await sleep(700);
+      await sleep(Number(process.env.ATD_WAIT_AFTER_EXPR || 700));
     }
 
     let expression2 = process.argv[6];

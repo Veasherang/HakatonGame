@@ -13,7 +13,7 @@
  */
 import { BALANCE } from '../config/balance.js';
 
-const MUTATION_PRICE_SCALE = 2.2;
+const MUTATION_PRICE_SCALE = 2.4;
 
 export const CREATURE_DEFS = {
   bobek: {
@@ -36,8 +36,8 @@ export const CREATURE_DEFS = {
     professions: ['cleaning', 'labour'],
     professionNames: ['УБОРЩИК', 'РАЗНОРАБОЧИЙ'],
     food: { love: 'broth', hate: 'dry' },
-    triggers: { light: 1.2, noise: 0.45, vent: 1.05, lock: 0.9, power: 0.7 },
-    hint: 'Резкий звук вызывает у него панику. Ровный свет и прохладный воздух успокаивают.',
+    triggers: { light: 1.2, noise: 0.4, vent: 1.1, lock: 0.5, power: 0.5 },
+    hint: 'Успокаивают только ровный свет и прохладная вентиляция. Шум, замки и отключение питания его злят.',
     ability: {
       name: 'ВПИТЫВАНИЕ',
       text: 'Поглощает жидкость и грязь. Точный эффект пока не задокументирован.',
@@ -117,8 +117,8 @@ export const CREATURE_DEFS = {
     professions: ['cleaning'],
     professionNames: ['УБОРЩИЦА', 'СОРТИРОВЩИЦА'],
     food: { love: 'porridge', hate: 'meat' },
-    triggers: { light: 0.4, noise: 0.35, vent: 1.3, lock: 0.8, power: 0.9 },
-    hint: 'Яркий свет и шум доводят её до паники. Вентиляция и темнота — единственное, что помогает.',
+    triggers: { light: 0.35, noise: 0.3, vent: 1.35, lock: 0.45, power: 0.4 },
+    hint: 'Единственное, что её успокаивает, — вентиляция. Свет, шум, замки и питание вызывают панику.',
     ability: {
       name: 'ЭХО',
       text: 'Повторяет голоса. Иногда — голосом предыдущего оператора.',
@@ -198,8 +198,8 @@ export const CREATURE_DEFS = {
     professions: ['combat', 'construction'],
     professionNames: ['ВОЕННЫЙ', 'СТРОИТЕЛЬ'],
     food: { love: 'meat', hate: 'gel' },
-    triggers: { light: 1.1, noise: 1.0, vent: 0.6, lock: 1.0, power: 1.5 },
-    hint: 'Импланты чувствительны к питанию. Отключение энергии его обездвиживает, сырость раздражает.',
+    triggers: { light: 1.15, noise: 0.5, vent: 0.4, lock: 0.5, power: 1.3 },
+    hint: 'Успокаивают свет и аварийное отключение питания. Шум, сырость и замки только злят.',
     ability: {
       name: 'СИЛОВОЙ ПРИВОД',
       text: 'Механические импланты усиливают удар. При отключении питания он становится почти безобидным.',
@@ -279,8 +279,8 @@ export const CREATURE_DEFS = {
     professions: ['cleaning', 'labour', 'mining', 'combat', 'construction', 'research', 'tech', 'diving'],
     professionNames: ['ТЕХНИК', 'ИССЛЕДОВАТЕЛЬ'],
     food: { love: 'gel', hate: 'dry' },
-    triggers: { light: 0.55, noise: 1.25, vent: 1.5, lock: 0.7, power: 0.9 },
-    hint: 'Он человек. Яркий свет причиняет боль, ровный гул и влажный воздух помогают. Не смотри ему в глаза.',
+    triggers: { light: 0.4, noise: 1.3, vent: 1.5, lock: 0.45, power: 0.5 },
+    hint: 'Помогают только ровный гул и влажная вентиляция. Свет, замки и отключение питания причиняют боль.',
     ability: {
       name: 'ПОСЛЕДНИЙ ЧЕЛОВЕК',
       text: 'Сохраняет остатки человеческого разума. Может выполнять сложные задания — и задавать вопросы.',
@@ -374,7 +374,7 @@ export const CREATURE_SHOP = [
   {
     id: 'pamydsa',
     slot: 2,
-    price: 1800,
+    price: 2000,
     unlockDay: 2,
     tag: 'ЖИВОТНОЕ',
     blurb: 'Птица с человеческим зрачком. Только уборка и сортировка.',
@@ -382,7 +382,7 @@ export const CREATURE_SHOP = [
   {
     id: 'mishutka',
     slot: 3,
-    price: 3800,
+    price: 4200,
     unlockDay: 4,
     tag: 'ЖИВОТНОЕ · КИБОРГ',
     blurb: 'Медведь-киборг. Военные и строительные контракты. Тяжёлый, дорогой, опасный.',
@@ -390,7 +390,7 @@ export const CREATURE_SHOP = [
   {
     id: 'vodolazik',
     slot: 4,
-    price: 7200,
+    price: 7600,
     unlockDay: 7,
     secret: true,
     tag: 'ПРОТОКОЛ 07',

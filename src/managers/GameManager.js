@@ -170,6 +170,7 @@ export class GameManager {
     this.addLog('СИСТЕМА АТД-67 АКТИВИРОВАНА', 'sys');
     this.addLog('ДЕНЬ 01. ОПЕРАТОР ДОПУЩЕН. В БУНКЕРЕ ТОЛЬКО БОБЭК.', 'sys');
     this.addAi('ДОБРО ПОЖАЛОВАТЬ, ОПЕРАТОР. ОСМОТРИ КАМЕРЫ. НЕ ОТКРЫВАЙ ЛИШНЕГО.');
+    this.state.daySnapshot = this.captureDay(this.state);
     this.save(true);
     this.bus.emit('new-game', this.state);
     return this.state;
@@ -205,25 +206,13 @@ export class GameManager {
     const meta = state.meta;
     const settings = state.settings;
     const snapshot = cloneState(state.daySnapshot);
+    // Сохраняем только мета-прогресс и настройки; всё остальное — ровно как в начале дня.
     snapshot.meta = meta;
     snapshot.settings = settings;
     snapshot.daySnapshot = cloneState(state.daySnapshot);
-    snapshot.phase = 'office';
-    snapshot.report = null;
-    snapshot.ending = null;
-    snapshot.endingResult = null;
-    snapshot.escape = null;
-    snapshot.alarm = null;
-    snapshot.escape = null;
-    snapshot.camDown = {};
-    snapshot.shiftTimeLeft = snapshot.shiftDuration;
-    snapshot.operatorEnergy = BALANCE.shift.energyMax;
-    snapshot.energyWarned = 0;
     this.state = snapshot;
     this.acc = 0;
     this.paused = false;
-    this.addLog(`ДЕНЬ ${this.state.day} ПЕРЕЗАПУЩЕН. ПОСЛЕДСТВИЯ ПОРАЖЕНИЯ СБРОШЕНЫ.`, 'danger');
-    this.addAi('ПРОТОКОЛ ПЕРЕЗАПУСКА ПРИНЯТ. НЕ ПОТЕРЯЙ ЕГО СНОВА.');
     this.save(true);
     this.bus.emit('day-restart', this.state);
     return true;
@@ -307,7 +296,12 @@ export class GameManager {
     const messages = [];
     const difficulty = difficultyForDay(state.day);
     for (const creature of state.creatures) {
-      tickCreature(creature, dt, { blackout: state.blackout, difficulty }, messages);
+      tickCreature(
+        creature,
+        dt,
+        { blackout: state.blackout, difficulty, random: () => this.rng.next() },
+        messages
+      );
       if (creature.training) {
         creature.training.timeLeft -= dt;
         if (creature.training.timeLeft <= 0) {
@@ -844,16 +838,11 @@ export class GameManager {
     };
   }
 
-  /** Убрать помехи на камере, чтобы вернуть доступ к комнате. */
+  /** Убрать помехи на камере после успешной мини-игры. */
   clearInterference(slot) {
     const state = this.state;
     if (!state || state.phase !== 'office') return { ok: false };
     if (!(state.camDown[slot] > 0)) return { ok: false, reason: 'Помех нет' };
-    if (!this.spend(BALANCE.interference.clearCost)) return { ok: false, reason: 'Нет денег' };
-    if (!this.useEnergy(BALANCE.interference.clearEnergy)) {
-      this.refund(BALANCE.interference.clearCost);
-      return { ok: false, reason: 'Нет энергии' };
-    }
     delete state.camDown[slot];
     this.addLog(`СЕКТОР ${slot}: ПОМЕХИ УСТРАНЕНЫ. СВЯЗЬ ВОССТАНОВЛЕНА.`, 'good');
     this.bus.emit('interference-cleared', { slot });
@@ -995,11 +984,43 @@ export class GameManager {
     return { ok: true };
   }
 
+  contractLimit() {
+    const state = this.state;
+    if (!state) return { total: 0, active: 0, max: 1, available: 0 };
+    const total = state.creatures.filter((creature) => creature.defId).length;
+    const active = state.creatures.filter((creature) => creature.status === 'contract').length;
+    const max = Math.max(1, total - 1);
+    return { total, active, max, available: Math.max(0, max - active) };
+  }
+
+  refillOffers() {
+    const state = this.state;
+    if (!state || state.offers.length >= 5) return state?.offers || [];
+    const fresh = generateOffers(state, this.rng);
+    const seen = new Set(state.offers.map((offer) => `${offer.companyId}:${offer.title}`));
+    for (const offer of fresh) {
+      const key = `${offer.companyId}:${offer.title}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      state.offers.push(offer);
+      if (state.offers.length >= 5) break;
+    }
+    this.bus.emit('offers', state.offers);
+    return state.offers;
+  }
+
   acceptOffer(offerId, slot) {
     const state = this.state;
     if (!state || state.phase !== 'office') return { ok: false };
     const offer = state.offers.find((item) => item.id === offerId);
     if (!offer) return { ok: false, reason: 'Предложение устарело' };
+    const limit = this.contractLimit();
+    if (limit.available <= 0) {
+      return {
+        ok: false,
+        reason: `Лимит контрактов: ${limit.active}/${limit.max}. Верните существо из бункера.`,
+      };
+    }
     if ((state.camDown[slot] || 0) > 0) {
       this.notify('ПОМЕХИ НА КАМЕРЕ. СНАЧАЛА ВОССТАНОВИТЕ СВЯЗЬ.', 'danger');
       return { ok: false, reason: 'Помехи на камере' };
@@ -1150,6 +1171,7 @@ export class GameManager {
       this.bus.emit('contract-done', result);
       this.bus.emit('creature', { slot: result.slot });
     }
+    this.refillOffers();
     this.save(true);
   }
 
@@ -1258,6 +1280,7 @@ export class GameManager {
         ? 'ТЫ ВСЁ ЕЩЁ ЗДЕСЬ. ЭТО ХОРОШО. НАВЕРНОЕ.'
         : 'НОВЫЙ ДЕНЬ. ПОКАЗАТЕЛИ ДОЛЖНЫ БЫТЬ В НОРМЕ.'
     );
+    state.daySnapshot = this.captureDay(state);
     this.save(true);
     this.bus.emit('day-start', state);
     this.bus.emit('shift-start', state);

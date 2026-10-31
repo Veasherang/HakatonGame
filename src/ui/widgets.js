@@ -316,6 +316,15 @@ export class LogList extends Phaser.GameObjects.Container {
     this.lineSize = options.size || 13;
     this.entries = [];
     this.lines = [];
+
+    // Жёстко обрезаем журнал по высоте, чтобы длинные строки не залезали
+    // на заголовок «ЖУРНАЛ».
+    const maskShape = scene.make.graphics({ x: 0, y: 0, add: false });
+    maskShape.fillStyle(0xffffff, 1);
+    maskShape.fillRect(x, y, width, height);
+    this.logMask = maskShape.createGeometryMask();
+    this.setMask(this.logMask);
+
     scene.add.existing(this);
   }
 
@@ -345,7 +354,8 @@ export class LogList extends Phaser.GameObjects.Container {
                   ? COLORS.purple
                   : COLORS.dim;
       const time = `${String(Math.floor(entry.time / 60)).padStart(2, '0')}:${String(entry.time % 60).padStart(2, '0')}`;
-      const line = makeText(this.scene, 0, y, `${time}  ${entry.text}`, {
+      const text = String(entry.text || '').slice(0, 180);
+      const line = makeText(this.scene, 0, y, `${time}  ${text}`, {
         size: this.lineSize,
         color,
         font: 'body',
@@ -356,7 +366,7 @@ export class LogList extends Phaser.GameObjects.Container {
       this.add(line);
       this.lines.push(line);
       y -= line.height + 3;
-      if (y < -10) break;
+      if (y < -this.h) break;
     }
   }
 }

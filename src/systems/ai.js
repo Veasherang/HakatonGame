@@ -15,14 +15,15 @@ export function aiAct(day) {
  * с одновременным отключением камеры.
  */
 export function rollAiLine(state, rng) {
-  const lyingCandidate = state.creatures.find(
-    (creature) =>
-      ['idle', 'training'].includes(creature.status) &&
-      creature.stats &&
-      (creature.stats.stress > 62 || creature.stats.aggression > 55)
+  const active = state.creatures.filter(
+    (creature) => ['idle', 'training'].includes(creature.status) && creature.stats
   );
+  const stressed = active.find(
+    (creature) => creature.stats.stress > 55 || creature.stats.aggression > 45
+  );
+  const lyingCandidate = stressed || (active.length ? rng.pick(active) : null);
 
-  if (lyingCandidate && rng.chance(0.4)) {
+  if (lyingCandidate && rng.chance(0.55)) {
     return {
       text: `ВНИМАНИЕ: СЕКТОР ${String(lyingCandidate.slot).padStart(2, '0')} ТРЕБУЕТ ПРОВЕРКИ.`,
       lie: false,
@@ -34,17 +35,17 @@ export function rollAiLine(state, rng) {
   // Чем ниже доверие к НАДЗОРУ и чем позже день, тем чаще он скрывает правду.
   const trust = state.plot?.aiTrust ?? 50;
   const lieChance = Math.max(
-    0.35,
-    Math.min(0.92, 0.38 + (state.day - 1) * 0.025 + (100 - trust) / 220)
+    0.5,
+    Math.min(0.96, 0.5 + (state.day - 1) * 0.03 + (100 - trust) / 220)
   );
 
   if (lyingCandidate && rng.chance(lieChance)) {
     return {
       text: rng.pick(AI_LINES.lie),
       lie: true,
-      camDown: { slot: lyingCandidate.slot, seconds: rng.int(14, 24) },
+      camDown: { slot: lyingCandidate.slot, seconds: rng.int(18, 30) },
       slot: lyingCandidate.slot,
-      stress: rng.int(2, 5),
+      stress: rng.int(3, 7),
     };
   }
 

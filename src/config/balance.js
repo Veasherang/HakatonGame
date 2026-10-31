@@ -7,22 +7,22 @@ export const BALANCE = {
   design: { width: 1280, height: 800 },
 
   shift: {
-    durationSec: 420,          // 7 минут на день
+    durationSec: 360,          // 6 минут на день
     energyMax: 100,
-    energyRegenPerMin: 3.2,
+    energyRegenPerMin: 3.0,
     lowEnergy: 30,
-    coffee: { cost: 180, energy: 24, limitPerShift: 3 },
+    coffee: { cost: 200, energy: 24, limitPerShift: 3 },
     speeds: [1, 2],
   },
 
   economy: {
-    startMoney: 2600,
-    startBiomass: 24,
+    startMoney: 1600,
+    startBiomass: 18,
     startReputation: 50,
     baseSalary: 600,
     salaryPerReputation: 4,
-    replacementCost: 2400,
-    generatorCost: 1400,
+    replacementCost: 2600,
+    generatorCost: 1600,
     generatorPower: 45,
     emergencyCost: 0,
     maxReputation: 100,
@@ -64,19 +64,23 @@ export const BALANCE = {
     biomassPerShift: 1.2,
     maxLevel: 12,
     xpPerLevel: 120,
+    rateChangeMin: 12,
+    rateChangeMax: 24,
+    slowChance: 0.08,
+    fastMin: 1.35,
+    fastMax: 1.95,
+    slowModifier: 0.3,
   },
 
   difficulty: {
-    perDay: 0.13,
-    eventSpeedPerDay: 0.05,
-    threatPerDay: 1.4,
-    contractPerDay: 1.6,
-    minIntervalScale: 0.45,
+    perDay: 0.15,
+    eventSpeedPerDay: 0.06,
+    threatPerDay: 1.6,
+    contractPerDay: 1.8,
+    minIntervalScale: 0.4,
   },
 
   interference: {
-    clearCost: 360,
-    clearEnergy: 7,
     baseSeconds: 16,
   },
 
@@ -84,15 +88,15 @@ export const BALANCE = {
     energyCost: 10,
     baseTime: 26,
     levelXp: 24,
-    priceScale: 2.4,
+    priceScale: 2.7,
   },
 
   mutation: {
     // Сколько нажатий нужно до следующей стадии.
-    clickTargets: [10, 14],
+    clickTargets: [15, 28],
     energyCost: 12,
-    stressPerClick: 0.35,
-    aggressionPerClick: 0.2,
+    stressPerClick: 0.45,
+    aggressionPerClick: 0.25,
   },
 
   contract: {
@@ -108,29 +112,29 @@ export const BALANCE = {
   },
 
   threat: {
-    alarmThreshold: 62,
-    alarmCooldown: 22,
-    countdownBase: 19,
-    countdownPerAdaptation: 2.6,
-    countdownPerSecurity: 2.6,
-    countdownPerSensor: 1.1,
+    alarmThreshold: 55,
+    alarmCooldown: 12,
+    countdownBase: 15,
+    countdownPerAdaptation: 2.2,
+    countdownPerSecurity: 2.2,
+    countdownPerSensor: 0.9,
     effectiveToolStress: 20,
     effectiveToolAggression: 24,
-    wrongToolStress: 11,
-    wrongToolAggression: 14,
-    escapeRepPenalty: 12,
-    escapeMoneyPenalty: 400,
+    wrongToolStress: 12,
+    wrongToolAggression: 15,
+    escapeRepPenalty: 15,
+    escapeMoneyPenalty: 500,
     escapeAdaptation: 1,
-    escapeLoyaltyPenalty: 10,
-    recaptureIntegrity: 30,
+    escapeLoyaltyPenalty: 12,
+    recaptureIntegrity: 25,
   },
 
   events: {
-    firstDelay: 18,
-    intervalMin: 24,
-    intervalMax: 44,
-    aiIntervalMin: 14,
-    aiIntervalMax: 28,
+    firstDelay: 10,
+    intervalMin: 14,
+    intervalMax: 26,
+    aiIntervalMin: 7,
+    aiIntervalMax: 16,
   },
 
   save: {

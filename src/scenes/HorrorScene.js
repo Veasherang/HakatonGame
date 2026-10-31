@@ -118,15 +118,10 @@ export class HorrorScene extends Phaser.Scene {
     if (this.finished) return;
     this.finished = true;
     manager.audio?.stopAlarm?.();
-    this.cameras.main.fadeOut(260, 0, 0, 0);
-    const transition = () => {
-      if (this.transitioned) return;
-      this.transitioned = true;
-      const report = manager.completeEscape();
-      if (report) this.scene.start('Report');
-      else this.scene.start('Menu');
-    };
-    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, transition);
-    this.time.delayedCall(300, transition);
+    // Без fadeOut: после крика сразу переходим к отчёту, чтобы не оставалось
+    // чёрного кадра, если событие завершения анимации потеряется.
+    const report = manager.completeEscape();
+    if (report) this.scene.start('Report');
+    else this.scene.start('Menu');
   }
 }

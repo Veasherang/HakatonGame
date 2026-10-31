@@ -162,7 +162,7 @@ export class EndingScene extends Phaser.Scene {
       this.scene.start('Menu');
     });
 
-    this.cameras.main.fadeIn(260, 0, 0, 0);
+    this.cameras.main.setAlpha(1);
   }
 
   showForced() {
@@ -207,7 +207,7 @@ export class EndingScene extends Phaser.Scene {
       },
     });
 
-    this.cameras.main.fadeIn(260, 0, 0, 0);
+    this.cameras.main.setAlpha(1);
   }
 
   showEnding(result) {
@@ -305,6 +305,6 @@ export class EndingScene extends Phaser.Scene {
       this.scene.start('Menu');
     });
 
-    this.cameras.main.fadeIn(300, 0, 0, 0);
+    this.cameras.main.setAlpha(1);
   }
 }

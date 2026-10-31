@@ -159,7 +159,6 @@ export class RoomScene extends Phaser.Scene {
       this.tweens.add({ targets: lamp, alpha: 0.15, duration: 1500, yoyo: true, repeat: -1 });
     }
 
-    this.buildObjectButtons();
     this.buildStateOverlay();
   }
 
@@ -274,8 +273,8 @@ export class RoomScene extends Phaser.Scene {
       onClick: () => this.openGuide(),
     });
     this.helpBtn.setDepth(41);
-    this.backBtn.setDepth(62);
-    this.helpBtn.setDepth(62);
+    this.backBtn.setDepth(40);
+    this.helpBtn.setDepth(41);
 
     this.otherAlarmBtn = new Button(this, 696, 16, 156, 34, 'ПЕРЕЙТИ', {
       variant: 'danger',
@@ -437,7 +436,7 @@ export class RoomScene extends Phaser.Scene {
       variant: 'amber',
       size: 8,
       icon: 'mutate',
-      sub: '2400 ₽',
+      sub: '2600 ₽',
       onClick: () => this.confirmReplacement(),
     });
     this.replacementBtn.setVisible(false);
@@ -477,46 +476,37 @@ export class RoomScene extends Phaser.Scene {
   buildInterference() {
     const container = this.add.container(0, 0).setDepth(60).setVisible(false);
     const dim = this.add
-      .rectangle(0, 0, 890, 800, 0x020607, 0.74)
+      .rectangle(0, 0, 1280, 800, 0x010203, 1)
       .setOrigin(0)
       .setInteractive();
     const noise = this.add
-      .tileSprite(0, 0, 890, 800, 'noise0')
+      .tileSprite(0, 0, 1280, 800, 'noise0')
       .setOrigin(0)
-      .setAlpha(0.18);
-    const title = makeText(this, 445, 252, 'ПОМЕХИ НА КАМЕРЕ', {
-      size: 16,
+      .setAlpha(0.35);
+    const title = makeText(this, 640, 190, 'СИГНАЛ ПОТЕРЯН', {
+      size: 20,
       color: COLORS.red,
       font: 'display',
       origin: [0.5, 0],
     });
     const subtitle = makeText(
       this,
-      445,
-      286,
-      'СВЯЗЬ С СЕКТОРОМ ПОТЕРЯНА.\nВЗАИМОДЕЙСТВИЕ С СУБЪЕКТОМ ЗАБЛОКИРОВАНО.\nВОССТАНОВИТЕ КАНАЛ ИЛИ ДОЖДИТЕСЬ.',
-      { size: 13, color: COLORS.text, font: 'body', align: 'center', origin: [0.5, 0], lineSpacing: 4 }
+      640,
+      228,
+      'ПОМЕХИ ПОЛНОСТЬЮ ЗАКРЫВАЮТ КАМЕРУ.\nСУБЪЕКТ НЕ ВИДЕН. СТАТУС НЕИЗВЕСТЕН.\nВОССТАНОВИТЕ КАНАЛ ИЛИ ДОЖДИТЕСЬ.',
+      { size: 14, color: COLORS.text, font: 'body', align: 'center', origin: [0.5, 0], lineSpacing: 5 }
     );
-    const timer = makeText(this, 445, 372, '', {
-      size: 24,
+    const timer = makeText(this, 640, 320, '', {
+      size: 28,
       color: COLORS.red,
       font: 'display',
       origin: [0.5, 0],
     });
-    const clear = new Button(this, 245, 430, 400, 46, 'УСТРАНИТЬ ПОМЕХИ · 360 ₽', {
+    const clear = new Button(this, 420, 390, 440, 50, 'ВОССТАНОВИТЬ СВЯЗЬ', {
       variant: 'danger',
-      size: 8,
+      size: 9,
       icon: 'sensor',
-      onClick: () => {
-        const result = manager.clearInterference(this.slot);
-        if (result.ok) {
-          manager.audio?.confirm?.();
-          showToast(this, 'СВЯЗЬ ВОССТАНОВЛЕНА', { kind: 'good', y: 676 });
-        } else {
-          showToast(this, result.reason || 'НЕДОСТУПНО', { kind: 'danger', y: 676 });
-        }
-        this.refreshAll();
-      },
+      onClick: () => this.openInterferenceGame(),
     });
     const back = new Button(this, 20, 18, 106, 36, 'НАЗАД', {
       variant: 'ghost',
@@ -525,7 +515,131 @@ export class RoomScene extends Phaser.Scene {
       onClick: () => this.goBack(),
     });
     container.add([dim, noise, title, subtitle, timer, clear, back]);
-    this.interference = { container, noise, timer, clear };
+    this.interference = { container, noise, timer, clear, game: null };
+  }
+
+  openInterferenceGame() {
+    if (this.interference?.game) return;
+    const variant = Math.random() < 0.5 ? 'clicker' : 'digits';
+    const game = this.add.container(0, 0).setDepth(70);
+    const panel = this.add.graphics();
+    drawPanel(panel, 250, 180, 780, 440, {
+      fill: 0x070d0f,
+      stroke: COLORS.red,
+      alpha: 0.99,
+      cornerColor: COLORS.red,
+      cornerSize: 14,
+    });
+    const heading = makeText(this, 280, 200, 'ВОССТАНОВЛЕНИЕ КАНАЛА', {
+      size: 13,
+      color: COLORS.red,
+      font: 'display',
+    });
+    const close = new Button(this, 960, 196, 44, 34, 'X', {
+      variant: 'ghost',
+      size: 8,
+      onClick: () => this.closeInterferenceGame(),
+    });
+    game.add([panel, heading, close]);
+
+    if (variant === 'clicker') this.buildJamClicker(game);
+    else this.buildJamDigits(game);
+    this.interference.game = game;
+  }
+
+  buildJamClicker(game) {
+    const target = 10 + Math.floor(Math.random() * 7) + this.slot;
+    let clicks = 0;
+    const hint = makeText(this, 640, 250, 'ПОМЕХИ ДРОЖАТ. НАЖИМАЙ, ЧТОБЫ СТАБИЛИЗИРОВАТЬ КАНАЛ.', {
+      size: 14,
+      color: COLORS.text,
+      font: 'body',
+      origin: [0.5, 0],
+      align: 'center',
+      wrap: 700,
+    });
+    const count = makeText(this, 640, 292, '', {
+      size: 11,
+      color: COLORS.amber,
+      font: 'display',
+      origin: [0.5, 0],
+    });
+    const bar = this.add.graphics();
+    const button = new Button(this, 490, 390, 300, 90, 'СТАБИЛИЗИРОВАТЬ', {
+      variant: 'danger',
+      size: 10,
+      onClick: () => {
+        clicks += 1;
+        count.setText(`${clicks} / ${target}`);
+        bar.clear();
+        drawBar(bar, 440, 350, 400, 12, (clicks / target) * 100, COLORS.red, { ticks: true });
+        this.cameras.main.shake(35, 0.001);
+        if (clicks >= target) this.completeInterferenceGame();
+      },
+    });
+    game.add([hint, count, bar, button]);
+    count.setText(`0 / ${target}`);
+    drawBar(bar, 440, 350, 400, 12, 0, COLORS.red, { ticks: true });
+  }
+
+  buildJamDigits(game) {
+    const numbers = [1, 2, 3, 4, 5, 6];
+    const shuffled = Phaser.Utils.Array.Shuffle([...numbers]);
+    let expected = 1;
+    const hint = makeText(this, 640, 246, 'ВОССТАНОВИ КОД: НАЖИМАЙ ЦИФРЫ ПО ВОЗРАСТАНИЮ.', {
+      size: 14,
+      color: COLORS.text,
+      font: 'body',
+      origin: [0.5, 0],
+    });
+    const status = makeText(this, 640, 280, 'СЛЕДУЮЩАЯ: 1', {
+      size: 10,
+      color: COLORS.amber,
+      font: 'display',
+      origin: [0.5, 0],
+    });
+    game.add([hint, status]);
+    const buttons = [];
+    shuffled.forEach((number, index) => {
+      const col = index % 3;
+      const row = Math.floor(index / 3);
+      const button = new Button(this, 440 + col * 145, 320 + row * 72, 125, 56, String(number), {
+        variant: 'danger',
+        size: 16,
+        onClick: () => {
+          if (number !== expected) {
+            expected = 1;
+            status.setText('СБОЙ. НАЧНИ С 1');
+            for (const item of buttons) item.setEnabled(true);
+            manager.audio?.error?.();
+            return;
+          }
+          expected += 1;
+          button.setEnabled(false);
+          status.setText(expected > 6 ? 'КОД ПРИНЯТ' : `СЛЕДУЮЩАЯ: ${expected}`);
+          if (expected > 6) this.completeInterferenceGame();
+        },
+      });
+      buttons.push(button);
+      game.add(button);
+    });
+  }
+
+  completeInterferenceGame() {
+    const result = manager.clearInterference(this.slot);
+    this.closeInterferenceGame();
+    if (result.ok) {
+      manager.audio?.confirm?.();
+      showToast(this, 'СВЯЗЬ ВОССТАНОВЛЕНА', { kind: 'good', y: 676 });
+      this.cameras.main.flash(180, 120, 40, 30);
+      this.refreshAll();
+    }
+  }
+
+  closeInterferenceGame() {
+    if (!this.interference?.game) return;
+    this.interference.game.destroy(true);
+    this.interference.game = null;
   }
 
   buildDefense() {    this.defenseBar = this.add.container(0, 0).setDepth(46).setVisible(false);
@@ -647,15 +761,14 @@ export class RoomScene extends Phaser.Scene {
     const remaining = this.state.camDown?.[this.slot] || 0;
     const active = remaining > 0;
     this.interference.container.setVisible(active);
-    if (!active) return;
+    if (!active) {
+      this.closeInterferenceGame();
+      return;
+    }
     if (this.modal && !this.defenseMode) this.closeModal();
     this.interference.timer.setText(`${Math.ceil(remaining)} С`);
-    this.interference.clear.setEnabled(
-      this.state.money >= 360 && this.state.operatorEnergy >= 7
-    );
-    this.interference.clear.setSub(
-      `ОСТАНЕТСЯ ${formatMoney(Math.max(0, this.state.money - 360))} ₽`
-    );
+    this.interference.clear.setEnabled(true);
+    this.interference.clear.setSub('МИНИ-ИГРА');
   }
 
   refreshTop() {
@@ -915,14 +1028,14 @@ export class RoomScene extends Phaser.Scene {
       return;
     }
 
-    this.actionButtons.feed.setEnabled(active && money >= 60 && energy >= 4);
+    this.actionButtons.feed.setEnabled(active && money >= 70 && energy >= 4);
     this.actionButtons.train.setEnabled(active);
     this.actionButtons.calm.setEnabled(active && energy >= 4);
     this.actionButtons.rest.setEnabled(active && (c.restCooldown || 0) <= 0 && energy >= 5);
     this.actionButtons.repair.setEnabled(
-      active && c.stats.integrity < maxIntegrity(c) - 1 && money >= 420 && energy >= 8
+      active && c.stats.integrity < maxIntegrity(c) - 1 && money >= 460 && energy >= 8
     );
-    this.actionButtons.repair.setSub('420 ₽');
+    this.actionButtons.repair.setSub('460 ₽');
     this.actionButtons.upgrade.setEnabled(active);
     const nextMutation = getMutation(this.def, c.stage + 1);
     this.actionButtons.mutate.setEnabled(active && Boolean(nextMutation));
@@ -930,8 +1043,10 @@ export class RoomScene extends Phaser.Scene {
       const info = manager.mutationInfo(this.slot);
       this.actionButtons.mutate.setSub(`${info.progress}%`);
     }
-    this.actionButtons.contract.setEnabled(active && matchingOffers.length > 0 && readiness >= 40);
-    this.actionButtons.contract.setSub(String(matchingOffers.length));
+    this.actionButtons.contract.setEnabled(
+      active && matchingOffers.length > 0 && readiness >= 40 && manager.contractLimit().available > 0
+    );
+    this.actionButtons.contract.setSub(`${matchingOffers.length}`);
 
     if (this.state.alarm?.slot === this.slot) {
       this.actionBar.setVisible(false);
@@ -1733,11 +1848,12 @@ export class RoomScene extends Phaser.Scene {
       width: 960,
       height: 610,
       build: (content, ox, oy) => {
+        const limit = manager.contractLimit();
         const head = makeText(
           this,
           ox,
           oy - 2,
-          `ГОТОВНОСТЬ: ${readiness}/100  ·  БЮДЖЕТ: ${formatMoney(this.state.money)} ₽  ·  ОФФЕРОВ: ${offers.length}`,
+          `ГОТОВНОСТЬ: ${readiness}/100  ·  БЮДЖЕТ: ${formatMoney(this.state.money)} ₽  ·  ОФФЕРОВ: ${offers.length}  ·  КОНТРАКТЫ ${limit.active}/${limit.max}`,
           { size: 12, color: readiness >= 60 ? COLORS.green : COLORS.amber, font: 'body' }
         );
         content.add(head);
@@ -1807,8 +1923,8 @@ export class RoomScene extends Phaser.Scene {
           });
           content.add([pay, flavor]);
 
-          const canTake = readiness >= offer.reqReadiness;
-          const button = new Button(this, ox + 640, y + 74, 224, 30, canTake ? 'НАЗНАЧИТЬ' : 'НЕ ГОТОВ', {            variant: canTake ? 'amber' : 'ghost',
+          const canTake = readiness >= offer.reqReadiness && manager.contractLimit().available > 0;
+          const button = new Button(this, ox + 640, y + 74, 224, 30, canTake ? 'НАЗНАЧИТЬ' : 'НЕТ МЕСТА', {            variant: canTake ? 'amber' : 'ghost',
             size: 7,
             enabled: canTake,
             onClick: () => {
@@ -2029,12 +2145,12 @@ export class RoomScene extends Phaser.Scene {
       return;
     }
     manager.audio?.ui?.();
-    this.scene.start('Office');
+    this.time.delayedCall(20, () => this.scene.start('Office'));
   }
 
   openGuide() {
     manager.audio?.ui?.();
     this.closeModal();
-    this.scene.start('Guide', { from: 'Room', slot: this.slot });
+    this.time.delayedCall(20, () => this.scene.start('Guide', { from: 'Room', slot: this.slot }));
   }
 }

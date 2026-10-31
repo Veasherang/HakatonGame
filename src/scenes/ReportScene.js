@@ -79,7 +79,7 @@ export class ReportScene extends Phaser.Scene {
     this.buildSummary();
     this.buildButtons();
 
-    this.cameras.main.fadeIn(220, 0, 0, 0);
+    this.cameras.main.setAlpha(1);
   }
 
   buildFinance() {

@@ -125,12 +125,12 @@ export class CameraWindow extends Phaser.GameObjects.Container {
     // Служебные оверлеи.
     this.offlineOverlay = scene.add.container(0, 0).setVisible(false);
     const offG = scene.add.graphics();
-    offG.fillStyle(0x04080a, 0.88);
+    offG.fillStyle(0x04080a, 1);
     offG.fillRect(0, 0, CAM_W, CAM_H);
     const offNoise = scene.add
       .tileSprite(0, 0, CAM_W, CAM_H, 'noise1')
       .setOrigin(0)
-      .setAlpha(0.2);
+      .setAlpha(0.3);
     const offText = makeText(scene, CAM_W / 2, CAM_H / 2 - 8, 'НЕТ СИГНАЛА', {
       size: 10,
       color: COLORS.red,
@@ -288,8 +288,6 @@ export class CameraWindow extends Phaser.GameObjects.Container {
       this.emptySub.setColor(shopSlot ? COLORS.purple : COLORS.dimmer);
     }
     if (isEmpty) {
-      this.emptyText.setText('СЕКТОР НЕ ВВЕДЁН');
-      this.emptySub.setText('ОЖИДАНИЕ СУБЪЕКТА');
       this.sprite.setVisible(false);
       this.setBarsVisible(false);
       this.contractOverlay.setVisible(false);
@@ -308,8 +306,9 @@ export class CameraWindow extends Phaser.GameObjects.Container {
     }
 
     this.setBarsVisible(!this.offline);
+    this.feed.setVisible(!this.offline);
     this.offlineOverlay.setVisible(this.offline);
-    this.contractOverlay.setVisible(isContract);
+    this.contractOverlay.setVisible(isContract && !this.offline);
     this.emptyOverlay.setVisible(isTerminated && !this.offline);
     if (isTerminated) {
       this.emptyText.setText('СУБЪЕКТ УТИЛИЗИРОВАН');
@@ -317,6 +316,24 @@ export class CameraWindow extends Phaser.GameObjects.Container {
     }
 
     this.sprite.setVisible(!isContract && !isTerminated && !isEscaped && !this.offline);
+
+    if (this.offline) {
+      // При потере сигнала камера не раскрывает ни существо, ни его состояние.
+      this.nameText.setText('—');
+      this.levelText.setText('—');
+      this.activityText.setText('СИГНАЛ ПОТЕРЯН');
+      this.activityText.setColor(COLORS.red);
+      this.footerText.setText('КАНАЛ НЕДОСТУПЕН');
+      this.readyLabel.setVisible(false);
+      this.readyValue.setVisible(false);
+      this.readyBar.setVisible(false);
+      this.badgeG.clear();
+      this.badgeText.setText('');
+      this.alarmG.clear();
+      this.contractOverlay.setVisible(false);
+      this.redrawFrame();
+      return;
+    }
     if (def && !isContract && !isTerminated && !isEscaped) {
       const texture = `${def.id}_${creature.stage}_thumb`;
       if (this.scene.textures.exists(texture)) {

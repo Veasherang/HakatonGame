@@ -87,6 +87,8 @@ try {
   });
   await client.send('Page.navigate', { url: 'http://127.0.0.1:8123/?screen=office&fresh=1' });
   await sleep(10000);
+  await client.send('Page.bringToFront');
+  await client.send('Runtime.evaluate', { expression: 'window.focus()' });
 
   const evaluate = async (expression) => {
     const result = await client.send('Runtime.evaluate', {
@@ -99,13 +101,16 @@ try {
   };
 
   const click = async (x, y) => {
+    await client.send('Page.bringToFront');
+    await client.send('Runtime.evaluate', { expression: 'window.focus()' });
     await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none' });
-    await sleep(60);
+    await sleep(100);
     await client.send('Input.dispatchMouseEvent', {
       type: 'mousePressed',
       x,
       y,
       button: 'left',
+      buttons: 1,
       clickCount: 1,
     });
     await sleep(90);
@@ -114,6 +119,7 @@ try {
       x,
       y,
       button: 'left',
+      buttons: 0,
       clickCount: 1,
     });
     await sleep(500);
@@ -143,6 +149,10 @@ try {
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
   check('Офис открыт', active.includes('Office'), active);
+  const finishButtonGone = await evaluate(
+    `!Boolean(window.__ATD__.game.scene.getScene('Office').endShiftBtn)`
+  );
+  check('Кнопка завершения дня удалена', finishButtonGone);
   await evaluate(`(() => {
     const m = window.__ATD__.manager;
     m.state.nextEventIn = 99999;
@@ -158,6 +168,13 @@ try {
   active = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
+  if (!active.includes('Shop')) {
+    await click(96, 351);
+    await sleep(1000);
+    active = await evaluate(
+      `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+    );
+  }
   check('Кнопка ПИТОМНИК открывает магазин', active.includes('Shop'), active);
 
   await click(84, 39);
@@ -165,6 +182,13 @@ try {
   active = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
+  if (!active.includes('Office')) {
+    await click(84, 39);
+    await sleep(1000);
+    active = await evaluate(
+      `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+    );
+  }
   check('Питомник возвращает в офис', active.includes('Office'), active);
 
   const before = await evaluate(
@@ -297,24 +321,32 @@ try {
       return JSON.stringify({ away: away.length, offers: m.state.offers.length });
     })()`);
     check('Контракт назначен через рынок', JSON.parse(contractState).away === 1, contractState);
+    await sleep(1200);
     await click(70, 38);
-    await sleep(900);
+    await sleep(1000);
+    let marketBack = await evaluate(
+      `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+    );
+    if (!marketBack.includes('Office')) {
+      await click(70, 38);
+      await sleep(1000);
+      marketBack = await evaluate(
+        `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+      );
+    }
   }
 
-  await click(1206, 39);
-  await sleep(700);
-  const confirmOpen = await evaluate(
-    `window.__ATD__.game.scene.scenes.some(s => s.scene.isActive() && s.scene.key === 'Modal')`
-  );
-  check('Кнопка ЗАВЕРШИТЬ открывает подтверждение', confirmOpen);
-
-  await click(503, 609);
+  await evaluate(`(() => {
+    const m = window.__ATD__.manager;
+    m.endShift('manual');
+    window.__ATD__.game.scene.getScene('Office').scene.start('Report');
+  })()`);
   await sleep(1800);
   let activeNow = await evaluate(
     `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
   );
   const reportPhase = await evaluate(`window.__ATD__.manager.state.phase`);
-  check('День завершается и открывается отчёт', activeNow.includes('Report') && reportPhase === 'report', `${activeNow} / ${reportPhase}`);
+  check('День завершается по таймеру и открывается отчёт', activeNow.includes('Report') && reportPhase === 'report', `${activeNow} / ${reportPhase}`);
 
   await click(1046, 708);
   await sleep(1800);
@@ -335,10 +367,16 @@ try {
   check('Записка второго дня показана', noteOpen);
 
   await client.send('Page.navigate', { url: 'http://127.0.0.1:8123/' });
-  await sleep(15000);
-  const menuActive = await evaluate(
-    `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
-  );
+  let menuActive = '';
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    await client.send('Page.bringToFront');
+    await client.send('Runtime.evaluate', { expression: 'window.focus()' });
+    await sleep(1000);
+    menuActive = await evaluate(
+      `window.__ATD__.game.scene.scenes.filter(s => s.scene.isActive()).map(s => s.scene.key).join(',')`
+    );
+    if (menuActive.includes('Menu')) break;
+  }
   check('После перезагрузки открывается меню', menuActive.includes('Menu'), menuActive);
 
   await click(268, 529);

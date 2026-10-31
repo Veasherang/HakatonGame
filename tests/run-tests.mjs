@@ -125,7 +125,7 @@ test('Кликер мутации заполняет шкалу и меняет 
   const creature = manager.get(1);
   manager.state.biomass = 400;
   assert.equal(manager.mutate(1).ok, false, 'без кликов мутация недоступна');
-  for (let index = 0; index < 10; index += 1) manager.mutationClick(1);
+  for (let index = 0; index < 15; index += 1) manager.mutationClick(1);
   const info = manager.mutationInfo(1);
   assert.equal(info.progress, 100);
   assert.equal(info.remaining, 0);
@@ -134,7 +134,7 @@ test('Кликер мутации заполняет шкалу и меняет 
   assert.equal(result.ok, true, result.reason);
   assert.equal(creature.stage, 2);
   assert.equal(manager.state.biomass, 400 - cost);
-  assert.equal(manager.mutationInfo(1).remaining, 14);
+  assert.equal(manager.mutationInfo(1).remaining, 28);
   assert.equal(manager.mutate(1).ok, false);
 });
 
@@ -197,6 +197,7 @@ test('Сдерживание снимает тревогу при верном �
   creature.stats.integrity = 15;
   for (let index = 0; index < 120 && !manager.state.alarm; index += 1) manager.advance(1);
   assert.ok(manager.state.alarm);
+  delete manager.state.camDown[1];
   const result = manager.defend(1, 'light');
   assert.equal(result.ok, true);
   assert.equal(result.success, true);
@@ -298,7 +299,7 @@ test('Все данные согласованы', () => {
       assert.ok(template.basePay > 0 && template.duration > 0);
     }
   }
-  assert.equal(NOTES.length, 8);
+  assert.equal(NOTES.length, 9);
   assert.equal(Object.keys(ENDINGS).length, 6);
   assert.equal(EMPTY_SLOTS.length, 2);
   assert.equal(Object.keys(UPGRADES).length, 6);
@@ -315,7 +316,7 @@ test('Питомник: старт с одним существом и поку�
   const result = manager.buyCreature('pamydsa');
   assert.equal(result.ok, true);
   assert.equal(manager.get(2).defId, 'pamydsa');
-  assert.equal(manager.state.money, 3200);
+  assert.equal(manager.state.money, 3000);
   assert.equal(manager.buyCreature('pamydsa').ok, false, 'повторная покупка запрещена');
   manager.state.day = 7;
   manager.state.money = 10000;
@@ -348,6 +349,50 @@ test('Сложность и события растут с днём', () => {
   assert.equal(manager.state.offers.length, BALANCE.contract.offersPerShift);
   const req = manager.state.offers.map((offer) => offer.reqReadiness);
   assert.ok(Math.min(...req) >= 24);
+});
+
+test('Лимит контрактов зависит от числа существ', () => {
+  const manager = fresh(606);
+  manager.state.day = 4;
+  manager.state.money = 50000;
+  manager.buyCreature('pamydsa');
+  assert.deepEqual(
+    { total: manager.contractLimit().total, max: manager.contractLimit().max },
+    { total: 2, max: 1 }
+  );
+  const first = manager.state.offers.find((offer) => offer.profession === 'cleaning');
+  assert.equal(manager.acceptOffer(first.id, 1).ok, true);
+  const second = manager.state.offers.find((offer) => offer.profession === 'cleaning');
+  assert.equal(manager.acceptOffer(second.id, 2).ok, false);
+});
+
+test('У каждого существа 1–2 эффективных средства успокоения', () => {
+  for (const [id, def] of Object.entries(CREATURE_DEFS)) {
+    const good = Object.values(def.triggers).filter((value) => value >= 1.05).length;
+    const bad = Object.values(def.triggers).filter((value) => value <= 0.68).length;
+    assert.ok(good >= 1 && good <= 2, `${id}: хороших инструментов ${good}`);
+    assert.equal(good + bad, Object.keys(def.triggers).length, `${id}: нет нейтральных инструментов`);
+  }
+});
+
+test('Перезапуск дня возвращает стартовые параметры', () => {
+  const manager = fresh(707);
+  const before = {
+    money: manager.state.money,
+    energy: manager.state.operatorEnergy,
+    hunger: manager.get(1).stats.hunger,
+    offers: manager.state.offers.length,
+  };
+  manager.state.money = 10;
+  manager.get(1).stats.hunger = 99;
+  manager.state.operatorEnergy = 0;
+  manager.endShift('exhausted');
+  assert.equal(manager.restartDay(), true);
+  assert.equal(manager.state.money, before.money);
+  assert.equal(manager.state.operatorEnergy, before.energy);
+  assert.equal(manager.get(1).stats.hunger, before.hunger);
+  assert.equal(manager.state.offers.length, before.offers);
+  assert.equal(manager.state.phase, 'office');
 });
 
 test('Симуляция 10 дней: экономика не уходит в минус и не ломается', () => {
@@ -407,7 +452,8 @@ test('Симуляция 10 дней: экономика не уходит в м
       if (manager.state.operatorEnergy < 30 && manager.state.money > 200) manager.buyCoffee();
     }
 
-    if (manager.state.phase === 'office') manager.endShift('manual');
+    if (manager.state.phase === 'escaping') manager.completeEscape();
+    else if (manager.state.phase === 'office') manager.endShift('manual');
     assert.ok(manager.state.report, `отчёт дня ${day + 1}`);
     assert.ok(manager.state.money >= 0);
     for (const creature of activeCreatures(manager)) {

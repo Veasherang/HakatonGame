@@ -222,6 +222,6 @@ export class ShopScene extends Phaser.Scene {
 
   goBack() {
     manager.audio?.ui?.();
-    this.scene.start('Office');
+    this.time.delayedCall(20, () => this.scene.start('Office'));
   }
 }

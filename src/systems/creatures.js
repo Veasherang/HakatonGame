@@ -34,6 +34,8 @@ export function createCreature(defId, slotOverride = null) {
     xp: 0,
     mutationProgress: 0,
     mutationClicks: 0,
+    rateMod: 1.6,
+    rateTimer: 0,
     stats: { ...def.base },
     upgrades: { ...UPGRADE_DEFAULT },
     skills: {},
@@ -232,15 +234,30 @@ export function tickCreature(creature, dt, env = {}, messages = []) {
   const triggers = def.triggers || {};
   const minutes = dt / 60;
   const difficulty = Math.max(0.5, Number(env.difficulty) || 1);
+  const random = env.random || Math.random;
+
+  // Метаболизм: обычно ускоренный, но изредка наступает короткое затишье.
+  creature.rateTimer = (creature.rateTimer || 0) - dt;
+  if (creature.rateTimer <= 0) {
+    const slow = random() < BALANCE.creature.slowChance;
+    creature.rateMod = slow
+      ? BALANCE.creature.slowModifier
+      : BALANCE.creature.fastMin +
+        random() * (BALANCE.creature.fastMax - BALANCE.creature.fastMin);
+    creature.rateTimer =
+      BALANCE.creature.rateChangeMin +
+      random() * (BALANCE.creature.rateChangeMax - BALANCE.creature.rateChangeMin);
+  }
+  const speedFactor = difficulty * (creature.rateMod || 1.6);
 
   // --- Голод и чистота -----------------------------------------------------
   const hungerRate =
-    BALANCE.creature.hungerRate * difficulty * (1 - upg.feeder * 0.09) * (1 - mods.hungerRate);
+    BALANCE.creature.hungerRate * speedFactor * (1 - upg.feeder * 0.09) * (1 - mods.hungerRate);
   s.hunger += hungerRate * minutes;
 
   const cleanRate =
     BALANCE.creature.cleanlinessRate *
-    difficulty *
+    speedFactor *
     (1 - upg.feeder * 0.06) *
     (1 - mods.cleanRate);
   s.cleanliness -= cleanRate * minutes;
@@ -269,10 +286,10 @@ export function tickCreature(creature, dt, env = {}, messages = []) {
   }
 
   stressRate -= mods.stressRate;
-  s.stress += stressRate * difficulty * minutes;
+  s.stress += stressRate * speedFactor * minutes;
 
   // --- Энергия и агрессия --------------------------------------------------
-  s.energy -= BALANCE.creature.energyRate * difficulty * minutes;
+  s.energy -= BALANCE.creature.energyRate * speedFactor * minutes;
   if (creature.status === 'training') s.energy -= 0.8 * minutes;
   if (creature.status === 'training') s.stress += 0.25 * minutes;
 
@@ -282,15 +299,15 @@ export function tickCreature(creature, dt, env = {}, messages = []) {
   if (s.cleanliness < BALANCE.creature.cleanBad) aggressionRate += 0.4;
   if (s.integrity < BALANCE.creature.integrityBad) aggressionRate += 0.35;
   if (s.loyalty > 70) aggressionRate -= 0.25;
-  s.aggression += aggressionRate * difficulty * minutes;
+  s.aggression += aggressionRate * speedFactor * minutes;
 
   // --- Здоровье ------------------------------------------------------------
   let healthDelta = 0;
   if (s.hunger > BALANCE.creature.hungerCritical) {
-    healthDelta -= BALANCE.creature.starvationDamage * minutes;
+    healthDelta -= BALANCE.creature.starvationDamage * speedFactor * minutes;
   }
   if (s.stress > BALANCE.creature.stressCritical) {
-    healthDelta -= BALANCE.creature.stressDamage * minutes;
+    healthDelta -= BALANCE.creature.stressDamage * speedFactor * minutes;
   }
   if (s.hunger < 55 && s.stress < 55 && s.cleanliness > 45) {
     healthDelta += (BALANCE.creature.healthRegen + mods.healthRegen) * minutes;
@@ -307,7 +324,7 @@ export function tickCreature(creature, dt, env = {}, messages = []) {
     (1 - upg.armor * 0.14) *
     (1 - upg.security * 0.08) *
     (1 - mods.integrityRate) *
-    difficulty;
+    speedFactor;
   s.integrity -= decay * minutes;
   if (s.stress < 42 && s.aggression < 42) {
     s.integrity += 0.18 * minutes;

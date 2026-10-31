@@ -174,6 +174,8 @@ export class SaveManager {
         normalized.stage = clamp(normalized.stage || 1, 1, 3);
         normalized.mutationClicks = Math.max(0, Math.floor(normalized.mutationClicks || 0));
         normalized.mutationProgress = clamp(normalized.mutationProgress || 0);
+        normalized.rateMod = isNumber(normalized.rateMod) ? normalized.rateMod : 1.6;
+        normalized.rateTimer = isNumber(normalized.rateTimer) ? normalized.rateTimer : 0;
         normalized.level = Math.max(1, normalized.level || 1);
         normalized.xp = Math.max(0, normalized.xp || 0);
         normalized.status = [

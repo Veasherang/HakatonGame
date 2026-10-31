@@ -66,6 +66,8 @@ export class OfficeScene extends Phaser.Scene {
           title: note.title,
           code: 'КАНАЛ ПРЕДЫДУЩЕГО ОПЕРАТОРА',
           body: `${note.text}\n\n— найденная записка, день ${note.day}`,
+          bodySize: 15,
+          lineSpacing: 5,
           accent: COLORS.purple,
           pause: true,
           typewriter: true,
@@ -274,7 +276,7 @@ export class OfficeScene extends Phaser.Scene {
       color: COLORS.dim,
       font: 'display',
     });
-    this.timerText = makeText(this, 124, 20, '08:00', {
+    this.timerText = makeText(this, 124, 20, '06:00', {
       size: 18,
       color: COLORS.text,
       font: 'display',
@@ -330,12 +332,6 @@ export class OfficeScene extends Phaser.Scene {
       },
     });
     bar.add(this.speedBtn);
-
-    this.endShiftBtn = new Button(this, 1150, 22, 112, 34, 'ЗАВЕРШИТЬ', {
-      variant: 'danger',
-      size: 8,
-      onClick: () => this.confirmEndShift(),
-    });    bar.add(this.endShiftBtn);
   }
 
   buildLeftPanel() {
@@ -364,7 +360,17 @@ export class OfficeScene extends Phaser.Scene {
     });
     panel.add(this.energyBar);
 
-    this.coffeeBtn = new Button(this, 20, 144, 152, 32, 'КОФЕ +24 · 180₽', {
+    this.energyWarnG = this.add.graphics();
+    panel.add(this.energyWarnG);
+    this.energyWarnText = makeText(this, 20, 129, '', {
+      size: 7,
+      color: COLORS.red,
+      font: 'display',
+    });
+    panel.add(this.energyWarnText);
+    this.energyEdge = this.add.graphics().setDepth(44);
+
+    this.coffeeBtn = new Button(this, 20, 144, 152, 32, 'КОФЕ +24 · 200₽', {
       variant: 'ghost',
       size: 7,
       icon: 'coffee',
@@ -388,7 +394,7 @@ export class OfficeScene extends Phaser.Scene {
     });
     panel.add(this.powerBar);
 
-    this.generatorBtn = new Button(this, 20, 218, 152, 32, 'ГЕНЕРАТОР 1400₽', {
+    this.generatorBtn = new Button(this, 20, 218, 152, 32, 'ГЕНЕРАТОР 1600₽', {
       variant: 'ghost',
       size: 7,
       icon: 'power',
@@ -748,8 +754,8 @@ export class OfficeScene extends Phaser.Scene {
       });
     }
 
-    this.coffeeBtn.setEnabled(state.coffeeUsed < 3 && state.money >= 180);
-    this.generatorBtn.setEnabled(state.money >= 1400);
+    this.coffeeBtn.setEnabled(state.coffeeUsed < 3 && state.money >= 200);
+    this.generatorBtn.setEnabled(state.money >= 1600);
   }
 
   refreshAi() {
@@ -790,10 +796,21 @@ export class OfficeScene extends Phaser.Scene {
     }
 
     const energy = manager.state?.operatorEnergy ?? 100;
-    if (energy < 25 && time > this.nextBlink) {
+    const low = energy < 30;
+    this.energyWarnG.clear();
+    this.energyEdge.clear();
+    this.energyWarnText.setText(low ? 'ЭНЕРГИЯ НА ИСХОДЕ' : '');
+    if (low) {
+      const pulse = 0.45 + Math.sin(time / 180) * 0.35;
+      this.energyWarnG.lineStyle(2, COLORS.red, pulse);
+      this.energyWarnG.strokeRect(18, 106, 156, 25);
+      this.energyEdge.lineStyle(3, COLORS.red, 0.1 + Math.sin(time / 220) * 0.06);
+      this.energyEdge.strokeRect(3, 3, 1274, 794);
+    }
+    if (energy < 15 && time > this.nextBlink) {
       this.nextBlink = time + 3200 + Math.random() * 3800;
-      this.cameras.main.shake(140, 0.0018);
-      const overlay = this.add.rectangle(0, 0, 1280, 800, 0x000000, 0.35).setOrigin(0).setDepth(70);
+      this.cameras.main.shake(100, 0.001);
+      const overlay = this.add.rectangle(0, 0, 1280, 800, 0x000000, 0.12).setOrigin(0).setDepth(70);
       this.tweens.add({
         targets: overlay,
         alpha: 0,
@@ -872,31 +889,7 @@ export class OfficeScene extends Phaser.Scene {
 
   openShop() {
     manager.audio?.ui?.();
-    this.scene.start('Shop');
-  }
-
-  confirmEndShift() {
-    this.scene.launch('Modal', {
-      title: 'ЗАВЕРШИТЬ ДЕНЬ?',
-      body:
-        'День будет завершён досрочно. Вы получите жалование и биомассу, но не успеете выполнить всё запланированное.\n\n' +
-        'Существа на контрактах продолжат работу.',
-      accent: COLORS.amber,
-      pause: true,
-      typewriter: false,
-      buttons: [
-        {
-          label: 'ЗАВЕРШИТЬ',
-          variant: 'danger',
-          onClick: () => {
-            manager.setPaused(false);
-            this.scene.stop('Modal');
-            manager.endShift('manual');
-          },
-        },
-        { label: 'ОСТАТЬСЯ', variant: 'ghost' },
-      ],
-    });
+    this.time.delayedCall(20, () => this.scene.start('Shop'));
   }
 
   showHelp() {
