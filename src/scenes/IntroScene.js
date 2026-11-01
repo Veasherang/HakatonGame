@@ -13,6 +13,7 @@ export class IntroScene extends Phaser.Scene {
   }
 
   create() {
+    manager.audio?.startGameMusic?.();
     addCoverImage(this, 'office_bg', 1280, 800, { tint: 0x4c5c60, alpha: 0.9 });
     addDarkness(this, 1280, 800, 0.55, -15);
     addCrt(this, 1280, 800, { scanAlpha: 0.22, vignetteAlpha: 0.7 });

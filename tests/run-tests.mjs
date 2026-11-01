@@ -450,6 +450,23 @@ test('Мытьё повышает чистоту и тратит деньги/э
   assert.equal(creature.stats.stress, stress + BALANCE.cleaning.stress);
 });
 
+test('Секретный пропуск ночи переводит на следующий день', () => {
+  const manager = fresh(1111);
+  const money = manager.state.money;
+  const creatures = manager.state.creatures.length;
+  assert.equal(manager.skipNight(), true);
+  assert.equal(manager.state.day, 2);
+  assert.equal(manager.state.phase, 'office');
+  assert.equal(manager.state.report, null);
+  assert.equal(manager.state.shiftTimeLeft, BALANCE.shift.durationSec);
+  assert.equal(manager.state.money, money);
+  assert.equal(manager.state.creatures.length, creatures);
+  manager.state.day = 9;
+  assert.equal(manager.skipNight(), true);
+  assert.equal(manager.state.day, 10);
+  assert.equal(manager.skipNight(), false);
+});
+
 test('Симуляция 10 дней: экономика не уходит в минус и не ломается', () => {
   const manager = fresh(2026);
   let totalContracts = 0;

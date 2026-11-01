@@ -1,7 +1,8 @@
 /**
- * Процедурный звук на WebAudio — без внешних файлов.
- * Атмосферный гул, щелчки интерфейса, сирена тревоги и помехи.
+ * Звук: процедурные WebAudio-эффекты + музыка и голоса из sounds/.
  */
+import { AUDIO_TRACKS } from '../audio/tracks.js';
+
 export class AudioManager {
   constructor() {
     this.ctx = null;
@@ -11,6 +12,258 @@ export class AudioManager {
     this.muted = false;
     this.volume = 0.5;
     this.started = false;
+    this.unlocked = false;
+
+    this.mode = 'none';
+    this.menuAudio = null;
+    this.ambientAudio = null;
+    this.endingAudio = null;
+    this.sirenAudio = null;
+    this.audioElements = new Set();
+    this.oneShots = new Set();
+    this.ambientTimer = null;
+    this.creepyTimer = null;
+    this.voicesTimer = null;
+    this.lastAmbient = -1;
+  }
+
+  asset(path) {
+    const map = typeof window !== 'undefined' ? window.ATD_SOUNDS : null;
+    return (map && map[path]) || path;
+  }
+
+  htmlVolume(channel = 1) {
+    return this.muted ? 0 : Math.min(1, Math.max(0, this.volume * channel));
+  }
+
+  makeAudio(path, loop, channelVolume) {
+    if (typeof Audio === 'undefined' || !path) return null;
+    const audio = new Audio(this.asset(path));
+    audio.preload = 'auto';
+    audio.loop = Boolean(loop);
+    audio._atdChannelVolume = channelVolume;
+    audio.volume = this.htmlVolume(channelVolume);
+    this.audioElements.add(audio);
+    return audio;
+  }
+
+  playAudio(audio) {
+    if (!audio) return false;
+    try {
+      const promise = audio.play();
+      if (promise?.catch) {
+        promise.catch(() => {
+          if (audio._atdAutoplayMuted) return;
+          // Браузер не разрешил звук до жеста: запускаем беззвучно,
+          // чтобы трек уже шёл, и включаем звук на первом движении/клике.
+          audio._atdAutoplayMuted = true;
+          audio.muted = true;
+          try {
+            const retry = audio.play();
+            if (retry?.catch) retry.catch(() => {});
+          } catch {
+            /* ignore */
+          }
+        });
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  applyHtmlVolumes() {
+    for (const audio of this.audioElements) {
+      audio.volume = this.htmlVolume(audio._atdChannelVolume ?? 1);
+    }
+  }
+
+  randomTrack(list) {
+    if (!list?.length) return null;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  stopAudio(audio, reset = true) {
+    if (!audio) return;
+    try {
+      audio.pause();
+      if (reset) audio.currentTime = 0;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  clearTimer(name) {
+    if (this[name]) {
+      clearTimeout(this[name]);
+      this[name] = null;
+    }
+  }
+
+  stopOneShots() {
+    for (const audio of this.oneShots) this.stopAudio(audio);
+    this.oneShots.clear();
+  }
+
+  stopGameLayers() {
+    this.clearTimer('ambientTimer');
+    this.clearTimer('creepyTimer');
+    this.clearTimer('voicesTimer');
+    if (this.ambientAudio) {
+      this.ambientAudio.onended = null;
+      this.stopAudio(this.ambientAudio);
+    }
+    this.stopOneShots();
+  }
+
+  stopMenuMusic() {
+    this.stopAudio(this.menuAudio);
+  }
+
+  stopEndingMusic() {
+    this.stopAudio(this.endingAudio);
+  }
+
+  playMenuMusic() {
+    this.init();
+    this.stopGameLayers();
+    this.stopEndingMusic();
+    this.stopAlarm();
+    this.mode = 'menu';
+    if (!this.menuAudio) {
+      this.menuAudio = this.makeAudio(AUDIO_TRACKS.menu[0], true, 0.45);
+    }
+    if (this.menuAudio) {
+      this.menuAudio.currentTime = 0;
+      this.menuAudio.onended = null;
+      this.playAudio(this.menuAudio);
+    }
+  }
+
+  startGameMusic() {
+    this.init();
+    if (this.mode === 'game') {
+      if (this.ambientAudio?.paused && !this.ambientTimer) this.playAudio(this.ambientAudio);
+      if (this.unlocked) this.scheduleExtras();
+      return;
+    }
+    this.mode = 'game';
+    this.stopMenuMusic();
+    this.stopEndingMusic();
+    this.stopGameLayers();
+    this.lastAmbient = -1;
+    this.nextAmbient();
+    this.scheduleCreepy(50000 + Math.random() * 50000);
+    this.scheduleVoices(20000 + Math.random() * 25000);
+  }
+
+  nextAmbient() {
+    if (this.mode !== 'game') return;
+    this.clearTimer('ambientTimer');
+    const list = AUDIO_TRACKS.ambient;
+    if (!list.length) return;
+    let index = Math.floor(Math.random() * list.length);
+    if (list.length > 1 && index === this.lastAmbient) index = (index + 1) % list.length;
+    this.lastAmbient = index;
+    const path = list[index];
+    if (!this.ambientAudio) {
+      this.ambientAudio = this.makeAudio(path, false, 0.4);
+    } else {
+      this.ambientAudio.onended = null;
+      this.ambientAudio.src = this.asset(path);
+      this.ambientAudio.load();
+    }
+    if (!this.ambientAudio) return;
+    this.ambientAudio.onended = () => {
+      if (this.mode !== 'game') return;
+      this.ambientTimer = setTimeout(() => this.nextAmbient(), 1600 + Math.random() * 2600);
+    };
+    this.ambientAudio.onerror = () => {
+      if (this.mode !== 'game') return;
+      this.ambientTimer = setTimeout(() => this.nextAmbient(), 2000);
+    };
+    this.playAudio(this.ambientAudio);
+  }
+
+  playOneShot(list, channelVolume = 0.55) {
+    const path = this.randomTrack(list);
+    if (!path) return;
+    const audio = this.makeAudio(path, false, channelVolume);
+    if (!audio) return;
+    this.oneShots.add(audio);
+    audio.onended = () => {
+      this.oneShots.delete(audio);
+      this.audioElements.delete(audio);
+    };
+    this.playAudio(audio);
+  }
+
+  scheduleExtras() {
+    if (this.mode !== 'game' || !this.unlocked) return;
+    if (!this.creepyTimer) this.scheduleCreepy();
+    if (!this.voicesTimer) this.scheduleVoices();
+  }
+
+  scheduleCreepy(delay) {
+    this.clearTimer('creepyTimer');
+    const wait = delay ?? 45000 + Math.random() * 75000;
+    this.creepyTimer = setTimeout(() => {
+      this.creepyTimer = null;
+      if (this.mode !== 'game') return;
+      this.playOneShot(AUDIO_TRACKS.creepy, 0.55);
+      this.scheduleCreepy();
+    }, wait);
+  }
+
+  scheduleVoices(delay) {
+    this.clearTimer('voicesTimer');
+    const wait = delay ?? 30000 + Math.random() * 60000;
+    this.voicesTimer = setTimeout(() => {
+      this.voicesTimer = null;
+      if (this.mode !== 'game') return;
+      this.playOneShot(AUDIO_TRACKS.voices, 0.5);
+      this.scheduleVoices();
+    }, wait);
+  }
+
+  playEndingMusic() {
+    this.init();
+    if (this.mode === 'ending' && this.endingAudio) {
+      if (this.endingAudio.paused) this.playAudio(this.endingAudio);
+      return;
+    }
+    this.mode = 'ending';
+    this.stopMenuMusic();
+    this.stopGameLayers();
+    this.stopAlarm();
+    this.stopEndingMusic();
+    this.endingAudio = this.makeAudio(AUDIO_TRACKS.ending[0], false, 0.55);
+    if (this.endingAudio) {
+      this.endingAudio.onended = null;
+      this.playAudio(this.endingAudio);
+    }
+  }
+
+  unlock() {
+    this.unlocked = true;
+    this.init();
+    this.resume();
+    for (const audio of this.audioElements) {
+      if (audio._atdAutoplayMuted) {
+        audio._atdAutoplayMuted = false;
+        audio.muted = false;
+        this.playAudio(audio);
+      }
+    }
+    this.applyHtmlVolumes();
+    if (this.mode === 'menu' && this.menuAudio) this.playAudio(this.menuAudio);
+    if (this.mode === 'ending' && this.endingAudio) this.playAudio(this.endingAudio);
+    if (this.mode === 'game') {
+      if (this.ambientAudio) this.playAudio(this.ambientAudio);
+      else this.nextAmbient();
+      this.scheduleExtras();
+    }
+    if (this.sirenAudio) this.playAudio(this.sirenAudio);
   }
 
   /** Вызывать после первого пользовательского жеста. */
@@ -43,6 +296,7 @@ export class AudioManager {
     if (this.master) {
       this.master.gain.setTargetAtTime(muted ? 0 : this.volume, this.ctx.currentTime, 0.05);
     }
+    this.applyHtmlVolumes();
   }
 
   setVolume(value) {
@@ -50,6 +304,7 @@ export class AudioManager {
     if (this.master && !this.muted) {
       this.master.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.05);
     }
+    this.applyHtmlVolumes();
   }
 
   noiseBuffer(duration = 2, gainValue = 0.5) {
@@ -65,7 +320,7 @@ export class AudioManager {
   startAmbient() {
     const ctx = this.ctx;
     this.ambientGain = ctx.createGain();
-    this.ambientGain.gain.value = 0.05;
+    this.ambientGain.gain.value = 0.025;
     this.ambientGain.connect(this.master);
 
     const hum = ctx.createOscillator();
@@ -90,7 +345,7 @@ export class AudioManager {
     filter.type = 'lowpass';
     filter.frequency.value = 340;
     const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.18;
+    noiseGain.gain.value = 0.1;
     noise.connect(filter);
     filter.connect(noiseGain);
     noiseGain.connect(this.ambientGain);
@@ -168,6 +423,18 @@ export class AudioManager {
   }
 
   startAlarm() {
+    this.init();
+    this.resume();
+    if (this.sirenAudio) {
+      this.playAudio(this.sirenAudio);
+      return;
+    }
+    this.sirenAudio = this.makeAudio(AUDIO_TRACKS.siren[0], true, 0.8);
+    if (this.sirenAudio) this.playAudio(this.sirenAudio);
+    else this.startFallbackAlarm();
+  }
+
+  startFallbackAlarm() {
     if (!this.ctx || this.alarmNodes) return;
     const ctx = this.ctx;
     const osc = ctx.createOscillator();
@@ -189,6 +456,10 @@ export class AudioManager {
   }
 
   stopAlarm() {
+    if (this.sirenAudio) {
+      this.stopAudio(this.sirenAudio);
+      this.sirenAudio = null;
+    }
     if (!this.alarmNodes) return;
     try {
       this.alarmNodes.osc.stop();
@@ -216,8 +487,25 @@ export class AudioManager {
     osc.stop(now + 2);
   }
 
-  /** Резкий скример: шумовой удар + падающий визг. */
+  /** Резкий скример из папки Jumpscares. */
   scream() {
+    const path = this.randomTrack(AUDIO_TRACKS.jumpscare);
+    if (path) {
+      const audio = this.makeAudio(path, false, 1);
+      if (audio) {
+        this.oneShots.add(audio);
+        audio.onended = () => {
+          this.oneShots.delete(audio);
+          this.audioElements.delete(audio);
+        };
+        this.playAudio(audio);
+        return;
+      }
+    }
+    this.screamProcedural();
+  }
+
+  screamProcedural() {
     if (!this.ctx) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;

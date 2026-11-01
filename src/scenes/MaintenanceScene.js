@@ -527,7 +527,7 @@ export class MaintenanceScene extends Phaser.Scene {
     this.cameras.main.flash(success ? 180 : 120, success ? 40 : 160, success ? 120 : 30, 30);
     if (success) manager.audio?.confirm?.();
     else manager.audio?.error?.();
-    this.time.delayedCall(1100, () => this.close());
+    this.time.delayedCall(reason === 'ОТКАЗ' ? 260 : 1100, () => this.close());
   }
 
   close() {

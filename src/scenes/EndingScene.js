@@ -20,6 +20,8 @@ export class EndingScene extends Phaser.Scene {
       return;
     }
 
+    manager.audio?.playEndingMusic?.();
+
     if (this.state.phase === 'ended' && this.state.endingResult) {
       this.showEnding(this.state.endingResult);
       return;

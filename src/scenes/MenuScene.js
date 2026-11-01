@@ -7,6 +7,7 @@ import { ENDINGS } from '../data/plot.js';
 import { addCoverImage, addCrt, addDarkness } from '../ui/backdrop.js';
 import { COLORS, addScanlines, drawPanel, makeText } from '../ui/theme.js';
 import { Button, showToast } from '../ui/widgets.js';
+import { addPumpkin } from '../ui/pumpkin.js';
 
 const PREVIEW_SLOTS = [
   { slot: 1, defId: 'bobek' },
@@ -31,6 +32,8 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    manager.audio?.playMenuMusic?.();
+
     this.saveResult = manager.saveManager.load();
     this.saveInfo = this.saveResult.ok ? this.saveResult.state : null;
     this.soundOn = this.loadSoundSetting();
@@ -44,6 +47,7 @@ export class MenuScene extends Phaser.Scene {
     this.buildPreview();
     this.buildButtons();
     this.buildFooter();
+    this.buildPumpkin();
 
     this.titleGlow = this.add
       .ellipse(280, 236, 460, 160, 0x6ad48a, 0.045)
@@ -367,8 +371,18 @@ export class MenuScene extends Phaser.Scene {
     this.scene.start('Guide', { from: 'Menu' });
   }
 
-  buildFooter() {
-    makeText(this, 88, 764, 'ВЕРСИЯ 1.0  ·  СБОРКА ATD67-1987  ·  ВСЕ ДНИ ЗАПИСЫВАЮТСЯ', {
+  /** Тыква в свободном нижнем углу, ниже панели трансляции. */
+  buildPumpkin() {
+    this.pumpkin = addPumpkin(this, {
+      x: Phaser.Math.Between(960, 1050),
+      y: 792,
+      minHeight: 95,
+      maxHeight: 120,
+      depth: 0,
+    });
+  }
+
+  buildFooter() {    makeText(this, 88, 764, 'ВЕРСИЯ 1.0  ·  СБОРКА ATD67-1987  ·  ВСЕ ДНИ ЗАПИСЫВАЮТСЯ', {
       size: 7,
       color: COLORS.dimmer,
       font: 'display',

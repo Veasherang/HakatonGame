@@ -1349,6 +1349,25 @@ export class GameManager {
     return true;
   }
 
+  /** Секретный пропуск ночи: сразу следующий день без отчёта. */
+  skipNight() {
+    const state = this.state;
+    if (!state || state.phase === 'ended' || state.day >= BALANCE.plot.finalDay) return false;
+    advanceDay(state, this.rng);
+    state.shiftStats = createShiftStats(state);
+    state.ending = null;
+    state.endingResult = null;
+    this.acc = 0;
+    this.paused = false;
+    this.addLog(`СЕКРЕТНЫЙ ПРОТОКОЛ: НОЧЬ ${state.day - 1} ПРОПУЩЕНА.`, 'plot');
+    this.addAi('ПРОПУСК НОЧИ ПРИНЯТ. НЕ РАССКАЗЫВАЙ ОБ ЭТОМ.');
+    state.daySnapshot = this.captureDay(state);
+    this.save(true);
+    this.bus.emit('day-start', state);
+    this.bus.emit('shift-start', state);
+    return true;
+  }
+
   /** Совместимость со старыми вызовами. */
   nextShift() {
     return this.nextDay();

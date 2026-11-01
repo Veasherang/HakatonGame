@@ -12,6 +12,7 @@ import { BALANCE, STAT_META } from '../config/balance.js';
 import { addCoverImage } from '../ui/backdrop.js';
 import { COLORS, addScanlines, drawBar, drawIcon, drawPanel, makeText, statColor } from '../ui/theme.js';
 import { Button, StatBar, showToast } from '../ui/widgets.js';
+import { addPumpkin } from '../ui/pumpkin.js';
 import { formatMoney, roman } from '../utils/format.js';
 
 const PANEL = { x: 896, y: 8, w: 376, h: 784 };
@@ -45,6 +46,7 @@ export class RoomScene extends Phaser.Scene {
 
     this.buildBackground();
     this.buildDiorama();
+    this.buildPumpkins();
     this.buildTopBar();
     this.buildPanel();
     this.buildActions();
@@ -213,6 +215,23 @@ export class RoomScene extends Phaser.Scene {
       origin: [0.5, 0],
     });
     this.stateOverlay.add([g, this.stateTitle, this.stateSub, this.stateBar, this.stateFoot]);
+  }
+
+  /** Случайная декоративная тыква на безопасном месте у стены. */
+  buildPumpkins() {
+    const slots = [
+      { x: 150, y: 668, flip: false },
+      { x: 790, y: 668, flip: true },
+    ];
+    const slot = Phaser.Utils.Array.GetRandom(slots);
+    this.pumpkin = addPumpkin(this, {
+      x: slot.x + Phaser.Math.Between(-8, 8),
+      y: slot.y + Phaser.Math.Between(-3, 3),
+      minHeight: 100,
+      maxHeight: 125,
+      depth: 4,
+      flip: slot.flip,
+    });
   }
 
   buildTopBar() {
@@ -538,7 +557,7 @@ export class RoomScene extends Phaser.Scene {
   }
 
   buildJamClicker(game) {
-    const target = 5 + Math.floor(Math.random() * 11);
+    const target = 5 + Math.floor(Math.random() * 6);
     let clicks = 0;
     const hint = makeText(this, 640, 250, 'ПОМЕХИ ДРОЖАТ. НАЖИМАЙ, ЧТОБЫ СТАБИЛИЗИРОВАТЬ КАНАЛ.', {
       size: 14,
@@ -573,7 +592,7 @@ export class RoomScene extends Phaser.Scene {
   }
 
   buildJamDigits(game) {
-    const count = 6 + Math.floor(Math.random() * 4);
+    const count = 4 + Math.floor(Math.random() * 3);
     const numbers = Array.from({ length: count }, (_, index) => index + 1);
     const shuffled = Phaser.Utils.Array.Shuffle([...numbers]);
     let expected = 1;

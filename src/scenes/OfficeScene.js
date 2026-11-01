@@ -14,6 +14,7 @@ import {
   makeText,
 } from '../ui/theme.js';
 import { Button, LogList, StatBar, showToast } from '../ui/widgets.js';
+import { addPumpkin } from '../ui/pumpkin.js';
 import { formatMoney, formatTime } from '../utils/format.js';
 import { threatScore } from '../systems/threat.js';
 
@@ -45,6 +46,7 @@ export class OfficeScene extends Phaser.Scene {
     this.buildTopBar();
     this.buildLeftPanel();
     this.buildRightPanel();
+    this.buildPumpkin();
     this.buildHotkeys();
 
     this.bindEvents();
@@ -87,6 +89,18 @@ export class OfficeScene extends Phaser.Scene {
   /* ========================================================================
      Построение сцены
      ====================================================================== */
+
+  /** Тыква на свободном участке стола справа, вне интерфейса. */
+  buildPumpkin() {
+    this.pumpkin = addPumpkin(this, {
+      x: Phaser.Math.Between(1030, 1120),
+      y: 794,
+      minHeight: 90,
+      maxHeight: 112,
+      depth: 11,
+      alpha: 0.9,
+    });
+  }
 
   buildBackground() {
     addCoverImage(this, 'office_bg', 1280, 800, {

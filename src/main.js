@@ -101,6 +101,7 @@ function boot() {
     if (!manager.state) return;
     const activeKeys = phaserGame.scene.getScenes(true).map((scene) => scene.scene.key);
     if (!activeKeys.some((key) => gameplayKeys.has(key))) return;
+    if (audio.mode !== 'game') audio.startGameMusic();
     manager.tick(delta);
     maintenance.update(delta, phaserGame, activeKeys);
   });
@@ -117,6 +118,25 @@ function boot() {
   manager.bus.on('alarm-cleared', () => audio.stopAlarm());
   manager.bus.on('escape', () => audio.stopAlarm());
   manager.bus.on('shift-end', () => audio.stopAlarm());
+
+  // Секретный пропуск ночи: Ctrl+Alt+N.
+  window.addEventListener('keydown', (event) => {
+    if (event.repeat || !event.ctrlKey || !event.altKey) return;
+    if (event.code !== 'KeyN' && String(event.key).toLowerCase() !== 'n') return;
+    event.preventDefault();
+    if (!manager.skipNight()) return;
+
+    const maintenance = phaserGame.scene.getScene('Maintenance');
+    if (maintenance?.scene.isActive()) maintenance.close();
+    const modal = phaserGame.scene.getScene('Modal');
+    if (modal?.scene.isActive()) modal.scene.stop();
+
+    const active = phaserGame.scene
+      .getScenes(true)
+      .find((scene) => !['Maintenance', 'Modal'].includes(scene.scene.key));
+    if (active) active.scene.start('Office');
+    else phaserGame.scene.start('Office');
+  });
 
   // Магазин и рынок не имеют собственных обработчиков завершения смены/побега,
   // но теперь время в них идёт.
@@ -139,10 +159,10 @@ function boot() {
   window.__ATD__ = { game: phaserGame, manager, audio, maintenance };
 
   const unlockAudio = () => {
-    audio.init();
-    audio.resume();
+    audio.unlock();
   };
   window.addEventListener('pointerdown', unlockAudio, { once: true });
+  window.addEventListener('pointermove', unlockAudio, { once: true, passive: true });
   window.addEventListener('keydown', unlockAudio, { once: true });
 
   document.addEventListener('visibilitychange', () => {

@@ -29,6 +29,12 @@ export class BootScene extends Phaser.Scene {
     this.load.image('office_bg', this.assetSource('office_bg', 'assets/office_bg.png'));
     this.load.image('room_bg', this.assetSource('room_bg', 'assets/room_bg.png'));
     this.load.image('cam_bg', this.assetSource('cam_bg', 'assets/cam_bg.png'));
+    for (let index = 1; index <= 3; index += 1) {
+      this.load.image(
+        `pumpkin_${index}`,
+        this.assetSource(`pumpkin_${index}`, `assets/pumpkins/pump${index}.png`)
+      );
+    }
 
     for (const [id, index] of Object.entries(CREATURE_INDEX)) {
       for (let stage = 1; stage <= 3; stage += 1) {
@@ -91,6 +97,11 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(0x0a1213, 1).fillRect(20, 40, 600, 280);
       g.generateTexture('cam_bg', 640, 360);
       g.destroy();
+    }
+
+    for (let index = 1; index <= 3; index += 1) {
+      const key = `pumpkin_${index}`;
+      if (!this.textures.exists(key)) this.makeSilhouette(key, 0xb06a2a, 130, 100);
     }
 
     for (const [id] of Object.entries(CREATURE_INDEX)) {

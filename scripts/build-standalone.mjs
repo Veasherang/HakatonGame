@@ -22,6 +22,8 @@ const mimeFor = (file) => {
   if (file.endsWith('.webp')) return 'image/webp';
   if (file.endsWith('.woff2')) return 'font/woff2';
   if (file.endsWith('.png')) return 'image/png';
+  if (file.endsWith('.mp3')) return 'audio/mpeg';
+  if (file.endsWith('.wav')) return 'audio/wav';
   return 'application/octet-stream';
 };
 
@@ -36,12 +38,44 @@ function collectAssets() {
     cam_bg: dataUri('assets/cam_bg.png'),
   };
 
+  for (let index = 1; index <= 3; index += 1) {
+    manifest[`pumpkin_${index}`] = dataUri(`assets/pumpkins/pump${index}.png`);
+  }
+
   for (const [id, index] of Object.entries(CREATURE_INDEX)) {
     for (let stage = 1; stage <= 3; stage += 1) {
       manifest[`${id}_${stage}`] = dataUri(`assets/creatures/m${index}_s${stage}.png`);
       manifest[`${id}_${stage}_thumb`] = dataUri(
         `assets/creatures/m${index}_s${stage}_thumb.png`
       );
+    }
+  }
+  return manifest;
+}
+
+/** Все звуки, которые AudioManager берёт из sounds/. */
+function collectSounds() {
+  const manifest = {};
+  const dirs = [
+    'sounds/StartScreen',
+    'sounds/TheEnd',
+    'sounds/CreepySounds',
+    'sounds/Jumpscares',
+    'sounds/Siren',
+    'sounds/VoicesOfCreatures',
+    'sounds/Ambient',
+    'sounds/processed',
+  ];
+  for (const dir of dirs) {
+    const absolute = path.join(ROOT, dir);
+    if (!fs.existsSync(absolute)) continue;
+    for (const file of fs.readdirSync(absolute)) {
+      if (!/\.(mp3|wav)$/i.test(file)) continue;
+      // Из Ambient в сборку попадает только mp3: оригинальные WAV уже
+      // сжаты в sounds/processed и не должны раздувать standalone.
+      if (dir === 'sounds/Ambient' && !/\.mp3$/i.test(file)) continue;
+      const relative = `${dir}/${file}`.replaceAll('\\', '/');
+      manifest[relative] = dataUri(relative);
     }
   }
   return manifest;
@@ -82,6 +116,7 @@ function safeInline(code) {
 
 async function main() {
   const manifest = collectAssets();
+  const sounds = collectSounds();
   const bundle = safeInline(await buildBundle());
   const phaser = safeInline(readText('vendor/phaser.min.js').replace(/\/\/# sourceMappingURL=.*$/m, ''));
   const css = inlineCss();
@@ -104,7 +139,7 @@ async function main() {
   );
   html = html.replace(
     '<script type="module" src="src/main.js"></script>',
-    `<script>\nwindow.ATD_ASSETS = ${JSON.stringify(manifest)};\n${bundle}\n</script>`
+    `<script>\nwindow.ATD_ASSETS = ${JSON.stringify(manifest)};\nwindow.ATD_SOUNDS = ${JSON.stringify(sounds)};\n${bundle}\n</script>`
   );
 
   if (/<script[^>]+src=|<link[^>]+href="(?!data:)/.test(html)) {
@@ -115,7 +150,7 @@ async function main() {
   const sizeMb = fs.statSync(OUTPUT).size / (1024 * 1024);
   console.log(`Готово: ${OUTPUT}`);
   console.log(
-    `Размер: ${sizeMb.toFixed(2)} МБ · изображений: ${Object.keys(manifest).length} · JS: ${(bundle.length / 1024).toFixed(1)} КБ`
+    `Размер: ${sizeMb.toFixed(2)} МБ · изображений: ${Object.keys(manifest).length} · звуков: ${Object.keys(sounds).length} · JS: ${(bundle.length / 1024).toFixed(1)} КБ`
   );
 }
 
